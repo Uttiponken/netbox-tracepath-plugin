@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netbox-trace-print"
+version = "0.1.0"
+description = "Printable PDF cable traces for technicians and field engineers, for NetBox."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12.0"
+authors = [{ name = "Jean-Pierre" }]
+keywords = ["netbox", "netbox-plugin", "cable", "trace", "pdf", "print"]
+classifiers = [
+    "Framework :: Django",
+    "Intended Audience :: System Administrators",
+    "Topic :: System :: Networking",
+]
+# Deliberately empty: the plugin runs on a vanilla NetBox install with nothing
+# extra to install. The PDF writer and layout engine use the standard library
+# only, and the one font is bundled as package data.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["netbox_trace_print*"]
+
+[tool.setuptools.package-data]
+netbox_trace_print = ["templates/**", "fonts/*"]
