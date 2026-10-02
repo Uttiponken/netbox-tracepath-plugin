@@ -83,6 +83,20 @@ class Canvas:
         self.ops.append("S")
         self.restore()
 
+    def polygon(self, points, fill=0, stroke=None, width=0.5):
+        """A closed, filled (and optionally outlined) shape."""
+        self.save()
+        self.ops.append(_color_ops(fill, False))
+        if stroke is not None:
+            self.ops.append(_color_ops(stroke, True))
+            self._stroke_style(width, None)
+        (x0, y0), rest = points[0], points[1:]
+        self.ops.append(f"{_num(x0)} {_num(self._y(y0))} m")
+        for x, y in rest:
+            self.ops.append(f"{_num(x)} {_num(self._y(y))} l")
+        self.ops.append("b" if stroke is not None else "f")
+        self.restore()
+
     def line(self, x1, y1, x2, y2, **kw):
         self.polyline([(x1, y1), (x2, y2)], **kw)
 
