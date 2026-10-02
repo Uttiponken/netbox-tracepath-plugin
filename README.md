@@ -49,3 +49,10 @@ PLUGINS = ["netbox_trace_print"]
 ## License
 
 Apache-2.0, the same as NetBox.
+
+## Third-party
+
+The PDF text uses the DejaVu Sans and DejaVu Sans Condensed fonts (regular and bold),
+bundled in `netbox_trace_print/fonts/` under the Bitstream Vera / DejaVu licence
+(`LICENSE-DejaVu.txt`). They cover Latin, Greek and Cyrillic; other scripts such as
+CJK are not covered.
