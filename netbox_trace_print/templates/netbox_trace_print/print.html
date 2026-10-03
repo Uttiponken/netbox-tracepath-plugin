@@ -117,23 +117,26 @@
           <div class="card-body">
             {% render_field form.profile %}
             <button type="submit" name="apply" value="1" class="btn btn-outline-primary btn-sm mb-3">Apply profile</button>
-            <p class="small text-muted">
-              {{ selected }} of {{ total }} facts · printed as <strong>Layout: {{ layout_name }}</strong>.
-              Names of equipment, ports and cables are always printed.
-            </p>
-            {% for group in groups %}
-              <details class="mb-2"{% if forloop.first %} open{% endif %}>
-                <summary class="fw-bold">{{ group.label }}</summary>
-                <div class="ps-3">
-                  {% for key, label, on in group.items %}
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" name="fields" value="{{ key }}" id="f-{{ key }}"{% if on %} checked{% endif %}>
-                      <label class="form-check-label" for="f-{{ key }}">{{ label }}</label>
-                    </div>
-                  {% endfor %}
-                </div>
-              </details>
-            {% endfor %}
+            <details id="facts">
+              <summary class="small">
+                <strong>{{ selected }} of {{ total }} facts</strong> · printed as <strong>Layout: {{ layout_name }}</strong>
+                <span class="text-muted">(click to choose the facts)</span>
+              </summary>
+              <p class="small text-muted mt-2">Names of equipment, ports and cables are always printed.</p>
+              {% for group in groups %}
+                <details class="mb-2">
+                  <summary class="fw-bold">{{ group.label }}</summary>
+                  <div class="ps-3">
+                    {% for key, label, on in group.items %}
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="fields" value="{{ key }}" id="f-{{ key }}"{% if on %} checked{% endif %}>
+                        <label class="form-check-label" for="f-{{ key }}">{{ label }}</label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endfor %}
+            </details>
           </div>
           <div class="card-footer text-end">
             <button type="submit" class="btn btn-primary">Update</button>

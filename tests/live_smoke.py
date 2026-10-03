@@ -129,6 +129,9 @@ check("choosing a profile ticks exactly its facts", r.status_code == 200 and 'va
       and 'value="device.ipv4" id="f-device.ipv4" checked' not in body and "Layout: Field technician" in body, r.status_code)
 r = c.get(base + f"?profile={tech.pk}&custom=1&fields=device.serial", HTTP_HOST=HOST)
 check("an adjusted selection is named as such", b"Field technician (adjusted)" in r.content)
+check("the fact choices are in a collapsed section (closed by default) with the summary line outside the checkboxes",
+      b'<details id="facts">' in r.content and b'<details id="facts" open' not in r.content
+      and r.content.index(b'id="facts"') < r.content.index(b'name="fields"') and b"(click to choose the facts)" in r.content)
 r = c.get(base + "?custom=1", HTTP_HOST=HOST)
 check("ticking nothing is respected", r.status_code == 200 and b"0 of" in r.content and b"Custom selection" in r.content)
 r = c.get(base + "?custom=1&fields=device.serial&fields=not.a.key", HTTP_HOST=HOST)
