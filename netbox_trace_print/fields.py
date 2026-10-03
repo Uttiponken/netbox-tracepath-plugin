@@ -103,3 +103,26 @@ PROFILES = [
       "circuit.subtitle", "circuit.status", "circuit.commit_rate", "ct.port_speed",
       "doc.route", "doc.summary"]),
 ]
+
+
+# Groups of facts that other plugins provide. A group is offered only when that plugin is installed
+# (see catalogue.py); a profile may list these keys regardless, and they are ignored when the plugin is absent.
+PLUGIN_GROUPS = {
+    "fms": ("fms", "Fiber plant (netbox-fms)", [
+        ("fms.type", "Fiber cable type"), ("fms.fibers", "Fibers and construction"),
+        ("fms.sheath", "Sheath and deployment"), ("fms.serial", "Fiber cable serial number"),
+        ("fms.installed", "Install date and installer"), ("fms.marks", "Route marks"),
+        ("fms.notes", "Fiber cable notes"),
+    ]),
+    "wdm": ("wdm", "Optical (netbox-wdm)", [
+        ("wdm.node", "WDM node type and grid"), ("wdm.channel", "Channel and wavelength"),
+        ("wdm.status", "Channel status"), ("wdm.service", "Wavelength service"),
+        ("wdm.line", "Line port role"),
+    ]),
+}
+PLUGIN_KEYS = [key for _g, _l, items in PLUGIN_GROUPS.values() for key, _label in items]
+
+
+def groups(plugins=()):
+    """The catalogue's groups, plus those of the named plugins."""
+    return GROUPS + [PLUGIN_GROUPS[p] for p in plugins if p in PLUGIN_GROUPS]

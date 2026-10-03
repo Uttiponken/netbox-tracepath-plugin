@@ -14,7 +14,7 @@ from utilities.views import ViewTab  # noqa: F401  (kept for tabs added later)
 
 from . import __version__
 from .collect import KINDS, Collector, describe_path, model_for, paths_through
-from .fields import ALL_KEYS, GROUPS
+from . import catalogue
 from .forms import PrintOptionsForm, PrintProfileForm, pick_form
 from .layout import LayoutSpec, render as render_pdf
 from .models import PrintProfile
@@ -78,15 +78,15 @@ def _choose_keys(request, profile):
     Pressing Apply, or arriving without having customised anything, takes the profile's facts (all facts
     if there is no profile). Otherwise the ticked boxes win, including none ticked.
     """
-    base = set(profile.keys) if profile else set(ALL_KEYS)
+    base = set(profile.keys) if profile else set(catalogue.all_keys())
     if request.GET.get("custom") and not request.GET.get("apply"):
-        keys = set(request.GET.getlist("fields")) & set(ALL_KEYS)
+        keys = set(request.GET.getlist("fields")) & set(catalogue.all_keys())
     else:
-        keys = base & set(ALL_KEYS)
+        keys = base & set(catalogue.all_keys())
     if profile:
-        name = profile.name if keys == (base & set(ALL_KEYS)) else f"{profile.name} (adjusted)"
+        name = profile.name if keys == (base & set(catalogue.all_keys())) else f"{profile.name} (adjusted)"
     else:
-        name = "All facts" if keys == set(ALL_KEYS) else "Custom selection"
+        name = "All facts" if keys == set(catalogue.all_keys()) else "Custom selection"
     return keys, name
 
 
@@ -135,7 +135,7 @@ def _pdf_query(prep):
     if data.get("prepared_for"):
         pairs.append(("prepared_for", data["prepared_for"]))
     pairs.append(("custom", 1))
-    pairs += [("fields", k) for k in ALL_KEYS if k in prep["keys"]]
+    pairs += [("fields", k) for k in catalogue.all_keys() if k in prep["keys"]]
     return urlencode(pairs)
 
 
@@ -144,12 +144,12 @@ class PrintView(KindPermissionMixin, View):
         prep = _prepare(request, kind, pk)
         result = prep["result"]
         pdf_url = reverse("plugins:netbox_trace_print:pdf", kwargs={"kind": kind, "pk": pk}) + "?" + _pdf_query(prep)
-        groups = [{"label": label, "items": [(k, l, k in prep["keys"]) for k, l in items]} for _g, label, items in GROUPS]
+        groups = [{"label": label, "items": [(k, l, k in prep["keys"]) for k, l in items]} for _g, label, items in catalogue.groups()]
         return render(request, "netbox_trace_print/print.html", {
             "object": prep["obj"], "kind": kind, "label": KINDS[kind][2], "form": prep["form"], "path": prep["path"],
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
             "pdf_url": pdf_url, "version": __version__, "groups": groups, "layout_name": prep["layout_name"],
-            "selected": len(prep["keys"]), "total": len(ALL_KEYS), "pickers": _pickers(kind, prep["obj"]),
+            "selected": len(prep["keys"]), "total": len(catalogue.all_keys()), "pickers": _pickers(kind, prep["obj"]),
         })
 
 
@@ -180,9 +180,9 @@ class PrintProfileView(generic.ObjectView):
 
     def get_extra_context(self, request, instance):
         chosen = set(instance.keys)
-        known = [{"label": label, "items": [(l, k in chosen) for k, l in items]} for _g, label, items in GROUPS]
-        stale = sorted(chosen - set(ALL_KEYS))
-        return {"groups": known, "stale": stale, "selected": len(chosen & set(ALL_KEYS)), "total": len(ALL_KEYS)}
+        known = [{"label": label, "items": [(l, k in chosen) for k, l in items]} for _g, label, items in catalogue.groups()]
+        keys = set(catalogue.all_keys())
+        return {"groups": known, "stale": sorted(chosen - keys), "selected": len(chosen & keys), "total": len(keys)}
 
 
 class PrintProfileEditView(generic.ObjectEditView):

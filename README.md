@@ -61,6 +61,16 @@ the information always fits the chosen paper.
   upgrade script and by netbox-docker on start).
 - UTF-8 text throughout.
 
+## Other plugins (optional)
+
+If **netbox-fms** is installed, a cable's fiber-plant record is printed on it: fiber cable type, fibers and
+construction, sheath, serial number, install date and installer, route marks, notes. If **netbox-wdm** is
+installed, a muxponder's block says it is a WDM node, and its ports show channel and wavelength, channel
+status, the wavelength service riding on it, and the role of the line port. These facts are choices in the
+print profiles like any other. Neither plugin is needed: without them the facts and their choices are
+simply absent, and a profile that lists them keeps working. If the other plugin changes in a way this
+plugin does not understand, that part is skipped and logged instead of failing the printout.
+
 ## Known limits
 
 - Interfaces bridged to another interface are not followed past the bridge.

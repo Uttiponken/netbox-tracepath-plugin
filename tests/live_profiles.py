@@ -22,6 +22,7 @@ user = get_user_model().objects.get(username="demo-loader")
 TRACES = {
     "colo-tenant": lambda: Interface.objects.get(device__name="polaris-sto-sw-01", name="Ethernet49"),
     "helsinki-link": lambda: Interface.objects.get(device__name="hel-rtr-01", name="et-0/0/2"),
+    "brg-protect-path": lambda: Interface.objects.get(device__name="sto-dcp2-01", name="Line/2/1"),
 }
 RECIPIENT = {"Field technician": "Field engineer, Stockholm DC", "Customer-safe": "Polaris Cloud Services"}
 

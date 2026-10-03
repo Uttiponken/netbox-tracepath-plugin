@@ -101,7 +101,9 @@ from netbox_trace_print.models import PrintProfile
 check("the five built-in profiles were seeded", PrintProfile.objects.count() >= 5
       and {n for n, _d, _k in PROFILES} <= set(PrintProfile.objects.values_list("name", flat=True)))
 tech = PrintProfile.objects.get(name="Field technician")
-check("a profile's facts match the built-in definition", set(tech.keys) == set(dict((n, k) for n, _d, k in PROFILES)["Field technician"]))
+check("a profile's facts are the built-in definition, plus the plugin facts added by migration 0003",
+      set(dict((n, k) for n, _d, k in PROFILES)["Field technician"]) <= set(tech.keys)
+      and all(k.startswith(("fms.", "wdm.")) for k in set(tech.keys) - set(dict((n, k) for n, _d, k in PROFILES)["Field technician"])))
 r = c.get("/plugins/trace-print/profiles/", HTTP_HOST=HOST)
 check("profile list 200 and shows the profiles", r.status_code == 200 and b"Field technician" in r.content and b"Customer-safe" in r.content, r.status_code)
 r = c.get(f"/plugins/trace-print/profiles/{tech.pk}/", HTTP_HOST=HOST)
@@ -145,6 +147,55 @@ check("prepared-for is accepted", r.status_code == 200)
 check("print page links to the profiles", b"Print profiles" in c.get("/plugins/trace-print/", HTTP_HOST=HOST).content)
 mine.delete()
 check("profile can be deleted", not PrintProfile.objects.filter(name="tp-smoke").exists())
+
+print("== other plugins: FMS and WDM")
+from netbox_trace_print import catalogue, integrations
+from netbox_trace_print.collect import Collector, paths_through
+
+
+def all_fields(doc):
+    for b in doc.blocks:
+        yield from b.fields
+        for row in b.ports:
+            yield from row.in_fields
+            yield from row.out_fields
+    for lk in doc.links:
+        for cb in lk.cables:
+            yield from cb.fields
+
+
+dcp = Interface.objects.get(device__name="sto-dcp2-01", name="Line/2/1")
+doc = Collector(admin).trace_doc(paths_through(dcp)[0])
+facts = {f.key: f.value for f in all_fields(doc) if f.key.startswith(("fms.", "wdm."))}
+check("both integrations are installed and active here", set(integrations.active()) == {"fms", "wdm"}, integrations.active())
+check("the catalogue offers both groups", {"fms", "wdm"} <= {g for g, _l, _i in catalogue.groups()})
+check("a cable shows its fiber-plant record", facts.get("fms.type") == "Corning ALTOS Loose Tube 24F SM" and facts.get("fms.serial", "").startswith("CNG-ALTOS24-")
+      and "24 · loose tube" in facts.get("fms.fibers", "") and facts.get("fms.marks", "").startswith("0 – ") and "m" in facts.get("fms.marks", ""), facts)
+check("the install date and installer are shown", any(f.key == "fms.installed" and "20" in f.value for f in all_fields(doc)))
+check("a muxponder port shows channel, wavelength and service", facts.get("wdm.channel", "").startswith("C22 (") and "Baltic Retail Group Backup" in facts.get("wdm.service", ""), facts)
+check("a muxponder block says it is a WDM node", any(f.key == "wdm.node" for b in doc.blocks for f in b.fields))
+check("a line port shows its role", "wdm.line" in facts, sorted(facts))
+
+page = c.get(f"/plugins/trace-print/interface/{dcp.pk}/", HTTP_HOST=HOST).content.decode()
+check("the print page offers the plugin facts as choices", 'value="fms.serial"' in page and 'value="wdm.channel"' in page)
+from netbox_trace_print.models import PrintProfile as _P
+check("the built-in profiles got the plugin facts (customer-safe none)", "fms.type" in _P.objects.get(name="Full information").keys
+      and "wdm.service" in _P.objects.get(name="Field technician").keys and not [k for k in _P.objects.get(name="Customer-safe").keys if k.startswith(("fms.", "wdm."))])
+
+integrations.DISABLED.update({"fms", "wdm"})
+try:
+    doc_off = Collector(admin).trace_doc(paths_through(dcp)[0])
+    check("with the integrations switched off nothing from them is printed",
+          not [f for f in all_fields(doc_off) if f.key.startswith(("fms.", "wdm."))])
+    check("and the catalogue loses their groups", {"fms", "wdm"}.isdisjoint({g for g, _l, _i in catalogue.groups()}))
+    r = c.get(f"/plugins/trace-print/interface/{dcp.pk}/pdf/", HTTP_HOST=HOST)
+    check("the pdf still renders", r.status_code == 200 and r.content.startswith(b"%PDF"), r.status_code)
+    page_off = c.get(f"/plugins/trace-print/interface/{dcp.pk}/", HTTP_HOST=HOST).content.decode()
+    check("a profile that lists the plugin facts still prints (they are ignored)", 'value="fms.serial"' not in page_off)
+    r = c.get(f"/plugins/trace-print/profiles/{_P.objects.get(name='Full information').pk}/", HTTP_HOST=HOST)
+    check("its profile page names them as unknown instead of failing", r.status_code == 200 and b"no longer knows" in r.content, r.status_code)
+finally:
+    integrations.DISABLED.clear()
 
 print("== a user with no permissions")
 nobody = User.objects.create(username="tp-nobody")

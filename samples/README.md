@@ -13,6 +13,7 @@ One directory per plugin release, so a layout can be discussed by name and versi
 | 0.1.0 | The first layout |
 | 0.2.0 | Chevron markers where a trace continues on another page |
 | 0.3.0 | One real trace printed with each print profile (`<profile>-nordfiber-<trace>-a4-landscape.pdf`) |
+| 0.4.0 | The same with FMS and WDM facts, and a new trace, the Baltic Retail protect path across two WDM segments (`*-brg-protect-path-*`) |
 
 Regenerate with `python -m tests.demo_layout` (inside a NetBox container, see `run-tests.sh`);
 the real-data ones with `tests/live_render.py`.

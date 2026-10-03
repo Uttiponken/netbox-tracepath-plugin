@@ -130,3 +130,26 @@ class SelectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PluginGroupTests(unittest.TestCase):
+    def test_plugin_groups_are_only_added_when_asked_for(self):
+        from netbox_trace_print.fields import GROUPS as CORE, PLUGIN_GROUPS, PLUGIN_KEYS, groups
+        self.assertEqual(groups(), CORE)
+        self.assertEqual([g[0] for g in groups(("fms", "wdm"))][-2:], ["fms", "wdm"])
+        self.assertEqual(groups(("nope",)), CORE)
+        self.assertFalse(set(PLUGIN_KEYS) & set(ALL_KEYS))
+        self.assertEqual(len(PLUGIN_KEYS), len(set(PLUGIN_KEYS)))
+        for name, (group, label, items) in PLUGIN_GROUPS.items():
+            self.assertTrue(all(k.startswith(group + ".") for k, _l in items), name)
+
+    def test_the_keys_the_migration_adds_all_exist_in_the_catalogue(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("m3", "netbox_trace_print/migrations/0003_plugin_facts_in_profiles.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        from netbox_trace_print.fields import PLUGIN_KEYS
+        for name, keys in module.ADD.items():
+            self.assertFalse(set(keys) - set(PLUGIN_KEYS), f"{name}: {set(keys) - set(PLUGIN_KEYS)}")
+        self.assertEqual(set(module.ADD["Full information"]), set(PLUGIN_KEYS))
+        self.assertNotIn("Customer-safe", module.ADD)

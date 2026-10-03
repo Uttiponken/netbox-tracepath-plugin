@@ -42,15 +42,12 @@ class PrintOptionsForm(forms.Form):
 
 # -- print profiles ------------------------------------------------------------------
 
-from .fields import GROUPS  # noqa: E402
+from . import catalogue  # noqa: E402
 from .models import PrintProfile  # noqa: E402
 
 
 class PrintProfileForm(forms.ModelForm):
     """A profile: a name and which facts it shows, grouped as in the catalogue."""
-
-    fieldsets = (FieldSet("name", "description", name="Profile"),
-                 *[FieldSet(f"keys_{g}", name=label) for g, label, _items in GROUPS])
 
     class Meta:
         model = PrintProfile
@@ -59,11 +56,14 @@ class PrintProfileForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         chosen = set(self.instance.keys) if self.instance.pk else set()
-        for group, label, items in GROUPS:
+        groups = catalogue.groups()
+        self.fieldsets = (FieldSet("name", "description", name="Profile"),
+                          *[FieldSet(f"keys_{g}", name=label) for g, label, _items in groups])
+        for group, label, items in groups:
             self.fields[f"keys_{group}"] = forms.MultipleChoiceField(
                 label=label, required=False, choices=items, initial=[k for k, _l in items if k in chosen],
                 widget=forms.CheckboxSelectMultiple)
-        self.group_fields = [f"keys_{g}" for g, _l, _i in GROUPS]
+        self.group_fields = [f"keys_{g}" for g, _l, _i in groups]
 
     def save(self, commit=True):
         profile = super().save(commit=commit)

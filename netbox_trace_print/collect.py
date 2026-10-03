@@ -18,7 +18,7 @@ from django.utils import timezone
 from dcim.models import Cable, CablePath, PathEndpoint
 from netbox.choices import ColorChoices
 
-from . import __version__
+from . import __version__, integrations
 from .model import Block, Cable as CableInfo, Field, Link, PortRow, TraceDoc
 
 # kind (URL segment) -> (app label, model name, label shown to people)
@@ -142,7 +142,7 @@ def port_fields(term):
     out.append(_f("Label", getattr(term, "label", ""), "port.label"))
     out.append(_f("Description", term.description, "port.description"))
     out.append(_f("Marked connected", "Yes" if getattr(term, "mark_connected", False) else "", "port.marked_connected"))
-    return _fields(*out)
+    return _fields(*out) + integrations.port_facts(term)
 
 
 def port_name(term):
@@ -170,7 +170,7 @@ def cable_info(cable):
             _f("Description", cable.description, "cable.description"),
             _f("Tags", _tags(cable), "cable.tags"),
             _f("Comments", cable.comments, "cable.comments"),
-        ))
+        ) + integrations.cable_facts(cable))
 
 
 def _device_block(dev):
@@ -197,7 +197,7 @@ def _device_block(dev):
             _f("Description", dev.description, "device.description"),
             _f("Tags", _tags(dev), "device.tags"),
             _f("Comments", dev.comments, "device.comments"),
-        ),
+        ) + integrations.device_facts(dev),
         site=dev.site.name, location=dev.location.name if dev.location else "", rack=dev.rack.name if dev.rack else "")
 
 
