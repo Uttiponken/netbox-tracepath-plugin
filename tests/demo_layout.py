@@ -1,13 +1,27 @@
-"""Writes the layout demo PDFs to out/. Run: python -m tests.demo_layout"""
+"""
+Writes the sample PDFs for the current release to samples/<version>/.
 
+    python -m tests.demo_layout
+
+The files are named after the layout they show ("full-information" is the first
+layout: every field of every block and cable) so they can be discussed by name.
+"""
+
+import os
+
+from netbox_trace_print import __version__
 from netbox_trace_print.layout import LayoutSpec, render
 from tests.sample import long_trace
 
-CASES = [("A4", "landscape", 11), ("A4", "portrait", 11), ("A3", "landscape", 11), ("Letter", "landscape", 11)]
+LAYOUT = "full-information"
+CASES = [("A4", "landscape"), ("A4", "portrait"), ("A3", "landscape"), ("Letter", "landscape")]
 
 if __name__ == "__main__":
-    for paper, orient, n in CASES:
-        pdf, report = render(long_trace(n), LayoutSpec(paper=paper, orientation=orient))
-        name = f"out/layout-{paper.lower()}-{orient}.pdf"
-        open(name, "wb").write(pdf)
-        print(name, f"pages={report.pages} columns={report.columns} font={report.font_size} fits={report.fits}")
+    out_dir = os.path.join("samples", __version__)
+    os.makedirs(out_dir, exist_ok=True)
+    for paper, orient in CASES:
+        pdf, report = render(long_trace(11), LayoutSpec(paper=paper, orientation=orient))
+        path = os.path.join(out_dir, f"{LAYOUT}-{paper.lower()}-{orient}.pdf")
+        with open(path, "wb") as f:
+            f.write(pdf)
+        print(path, f"pages={report.pages} columns={report.columns} font={report.font_size} fits={report.fits}")

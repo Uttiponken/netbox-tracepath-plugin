@@ -43,7 +43,7 @@ def long_trace(blocks=11):
     blocks_ = [_device(t, r, d, i, o, rack=f"STO-TR-{k % 3 + 1:02d}", u=f"U{42 - k}") for k, (t, r, d, i, o) in enumerate(allb)]
     links = [Link([_cable(f"sto-cbl-{k + 1:05d}", length=("30 m" if k % 3 == 1 else "2 m"))]) for k in range(len(blocks_) - 1)]
     return TraceDoc(
-        title="Cable trace: polaris-sto-sw-01 · Ethernet49",
+        title=f"Cable trace: sto-cbl-00001 … sto-cbl-{len(links):05d}",
         summary=["From polaris-sto-sw-01 : Ethernet49   to   mma-rtr-01 : et-0/0/1",
                  f"{len(links)} cables · total length 126 m+ · path complete"],
         blocks=blocks_, links=links,

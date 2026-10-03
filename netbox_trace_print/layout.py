@@ -22,6 +22,7 @@ from .pdf.writer import Document
 
 PAD = 4.0          # inside a block
 GUTTER = 14.0      # left and right of the grid, where the return lines run
+RET_PAD = 12.0     # clear space between a return line and the blocks above and below it
 LINE_BLACK = 0
 SOFT = 0.28        # captions and secondary text: dark enough to stay readable in black and white
 HEADER_FILL = 0.9
@@ -186,17 +187,22 @@ class Engine:
             ports = max(plans[i].ports_h for i in idxs)
             det = max(plans[i].det_h for i in idxs)
             conn = hdr + m.lh * 1.5 - 0.1 * size            # connector y, from the top of the row
+            # cable names stand above the in-row connectors, so the connector must be low enough for them
+            for i in idxs[:-1]:
+                conn = max(conn, self._names_h(m, doc.links[i], gw - 6, False) + 4)
             h = hdr + ports + det
-            # cable text hanging under each in-row connector must fit inside the row
-            for c, i in enumerate(idxs[:-1]):
-                th = self._cable_text_height(m, doc.links[i], gw - 6)
-                h = max(h, conn + 5 + th + PAD)
+            # the details hanging under each in-row connector must fit inside the row
+            for i in idxs[:-1]:
+                h = max(h, conn + 4 + self._details_h(m, doc.links[i], gw - 6, False) + PAD)
             row_info.append({"idxs": idxs, "hdr": hdr, "ports": ports, "det": det, "h": h, "conn": conn})
 
+        # the cable between the last block of a row and the first of the next: name above the line,
+        # details below it, and clear space above and below the whole thing
         ret_h = {}
         for r, info in enumerate(row_info[:-1]):
             link = doc.links[info["idxs"][-1]]
-            ret_h[r] = 5 + self._cable_text_height(m, link, avail, wide=True) + 8
+            ret_h[r] = (RET_PAD + self._names_h(m, link, avail, True) + 6
+                        + self._details_h(m, link, avail, True) + RET_PAD)
 
         # header and footer heights
         head_first, head_next, foot = self._header_heights(m, content_w)
@@ -268,14 +274,14 @@ class Engine:
         p.det_h = h + 2 * PAD if block.fields else 0
         return p
 
-    def _cable_text(self, m, cable, width, wide):
-        """Lines of (text, bold) for one cable."""
-        title_w = width - 10
-        lines = [(t, True) for t in m.wrap(cable.title, title_w, True)]
+    def _cable_parts(self, m, cable, width, wide):
+        """(name lines, detail lines) for one cable. The name is drawn above the cable, the details below it."""
+        names = m.wrap(cable.title, width - (10 if cable.color_hex else 0), True)
         items = [f"{f.label}: {f.value}" if f.label else f.value for f in cable.fields]
         if cable.color_name:
             items.insert(0, f"Colour: {cable.color_name}")
-        if wide:
+        details = []
+        if wide:                                   # a wide line: flow the items, separated by dots
             cur = ""
             for item in items:
                 trial = item if not cur else f"{cur}   ·   {item}"
@@ -283,19 +289,22 @@ class Engine:
                     cur = trial
                 else:
                     if cur:
-                        lines.append((cur, False))
+                        details.append(cur)
                     wrapped = m.wrap(item, width)
-                    lines += [(t, False) for t in wrapped[:-1]]
+                    details += wrapped[:-1]
                     cur = wrapped[-1]
             if cur:
-                lines.append((cur, False))
-        else:
+                details.append(cur)
+        else:                                      # a narrow gap: one item per line
             for item in items:
-                lines += [(t, False) for t in m.wrap(item, width)]
-        return lines
+                details += m.wrap(item, width)
+        return names, details
 
-    def _cable_text_height(self, m, link, width, wide=False):
-        return sum(len(self._cable_text(m, c, width, wide)) for c in link.cables) * m.lh
+    def _names_h(self, m, link, width, wide):
+        return sum(len(self._cable_parts(m, c, width, wide)[0]) for c in link.cables) * m.lh
+
+    def _details_h(self, m, link, width, wide):
+        return sum(len(self._cable_parts(m, c, width, wide)[1]) for c in link.cables) * m.lh
 
     def _header_text(self, m, content_w):
         doc = self.doc
@@ -378,31 +387,35 @@ class Engine:
         for col, i in enumerate(info["idxs"]):
             self._draw_block(pt, plan, doc.blocks[i], plan["plans"][i], x0 + col * (bw + gw), y, h, info)
 
-        # connectors inside the row
+        # connectors inside the row: name above the line, details below it
         for col, i in enumerate(info["idxs"][:-1]):
             bx = x0 + col * (bw + gw) + bw
             self._cable_line(c, doc.links[i], [(bx, conn_y), (bx + gw, conn_y)])
-            self._cable_text_at(pt, m, doc.links[i], bx + 3, conn_y + 5, gw - 6, wide=False)
+            self._names_above(pt, m, doc.links[i], bx + gw / 2, gw - 6, conn_y - 3, False)
+            self._details_below(pt, m, doc.links[i], bx + 3, conn_y + 4, gw - 6, False)
 
-        # the link out of this row
+        # the cable out of this row, back under it and into the first block of the next row (or the next page)
         r = place["row"]
         if r in plan["ret_h"]:
             link = doc.links[info["idxs"][-1]]
             end_x = x0 + (len(info["idxs"]) - 1) * (bw + gw) + bw
-            under = y + h + 5
+            names_h = self._names_h(m, link, avail, True)
+            line_y = y + h + RET_PAD + names_h + 3
             nxt = plan["placements"][r + 1]
-            same_page = nxt["page"] == place["page"]
             nxt_info = plan["rows"][r + 1]
-            path = [(end_x, conn_y), (right_x, conn_y), (right_x, under), (left_x, under)]
+            same_page = nxt["page"] == place["page"]
+            path = [(end_x, conn_y), (right_x, conn_y), (right_x, line_y), (left_x, line_y)]
+            self._names_above(pt, m, link, x0 + avail / 2, avail, line_y - 3, True)
             if same_page:
                 path += [(left_x, nxt["y"] + nxt_info["conn"]), (x0, nxt["y"] + nxt_info["conn"])]
                 self._cable_line(c, link, path)
-                self._cable_text_at(pt, m, link, x0, under + 3, avail, wide=True, center=True)
+                self._details_below(pt, m, link, x0, line_y + 4, avail, True)
             else:
                 self._cable_line(c, link, path)
-                c.polygon([(left_x - 4, under + 2), (left_x + 4, under + 2), (left_x, under + 9)], fill=0)
-                pt.text(self.page_w / 2, under + 3, f"Continues on page {nxt['page'] + 1}", True, align="center")
-                self._cable_text_at(pt, m, link, x0, under + 3 + m.lh, avail, wide=True, center=True)
+                c.polygon([(left_x - 4, line_y), (left_x + 4, line_y), (left_x, line_y + 8)], fill=0)
+                self._details_below(pt, m, link, x0, line_y + 4, avail, True)
+                caption_y = line_y + 4 + self._details_h(m, link, avail, True) + 2
+                pt.text(x0 + avail / 2, caption_y, f"Continues on page {nxt['page'] + 1}", True, align="center")
 
         # arriving from the previous page
         if place["cont"]:
@@ -412,9 +425,11 @@ class Engine:
             conn = y + info["conn"]
             self._cable_line(c, link, [(left_x, top), (left_x, conn), (x0, conn)])
             c.polygon([(left_x - 4, top + 2), (left_x + 4, top + 2), (left_x, top + 9)], fill=0)
-            pt.text(self.page_w / 2, top + 3, f"Continued from page {plan['placements'][r - 1]['page'] + 1}", True,
+            pt.text(x0 + avail / 2, top + 3, f"Continued from page {plan['placements'][r - 1]['page'] + 1}", True,
                     align="center")
-            self._cable_text_at(pt, m, link, x0, top + 3 + m.lh, avail, wide=True, center=True)
+            names_h = self._names_h(m, link, avail, True)
+            self._names_above(pt, m, link, x0 + avail / 2, avail, top + 3 + m.lh + names_h, True)
+            self._details_below(pt, m, link, x0, top + 3 + m.lh + names_h + 3, avail, True)
 
     def _cable_line(self, c, link, points):
         for k, cable in enumerate(link.cables):
@@ -426,17 +441,24 @@ class Engine:
             else:
                 c.polyline(pts, stroke=0, width=1.4, join="round")
 
-    def _cable_text_at(self, pt, m, link, x, top, width, wide, center=False):
+    def _names_above(self, pt, m, link, cx, width, bottom, wide):
+        """The cable names, centred on cx and ending at `bottom`, with the colour swatch before each name."""
+        lines = [(c, t) for c in link.cables for t in self._cable_parts(m, c, width, wide)[0]]
+        top = bottom - len(lines) * m.lh
+        for k, (cable, text) in enumerate(lines):
+            w = m.width(text, True)
+            if cable.color_hex and k == [c for c, _ in lines].index(cable):
+                pt.c.rect(cx - w / 2 - 10, top + k * m.lh + 2.5, 7, 5, fill=cable.color_hex, stroke=0, width=0.6)
+            pt.text(cx, top + k * m.lh, text, True, align="center")
+
+    def _details_below(self, pt, m, link, x, top, width, wide):
+        """The cable details from `top` down: left-aligned in a narrow gap, centred on a wide line."""
         for cable in link.cables:
-            lines = self._cable_text(m, cable, width, wide)
-            for k, (text, bold) in enumerate(lines):
-                if center:
-                    pt.text(x + width / 2, top, text, bold, align="center")
-                elif k == 0 and cable.color_hex:
-                    pt.c.rect(x, top + 2.5, 7, 5, fill=cable.color_hex, stroke=0, width=0.6)
-                    pt.text(x + 10, top, text, bold)
+            for text in self._cable_parts(m, cable, width, wide)[1]:
+                if wide:
+                    pt.text(x + width / 2, top, text, align="center")
                 else:
-                    pt.text(x, top, text, bold)
+                    pt.text(x, top, text)
                 top += m.lh
 
     def _draw_block(self, pt, plan, block, bp, bx, y, h, info):
