@@ -3,7 +3,8 @@
 ## Steps
 
 1. **Printable trace.** Done so far: PDF output (standard library only, UTF-8), the "full
-   information" layout, real traces from NetBox, picker and print pages. To do: choose which fields
+   information" layout, real traces from NetBox, picker and print pages, chevron markers where a
+   trace continues on another page. To do: choose which fields
    to print depending on who gets the printout (presets), as a selection at print time.
 2. **Colour by site / location / rack**, so connection points are easy to find, and still fully
    readable in black and white (tint + pattern + text tag, never colour alone).
@@ -21,6 +22,10 @@
   the first of the next is drawn as a return line under the row. Every cable's name stands above it,
   its details below. Long traces continue on further pages with "continues on / continued from".
 - Title names the connection (cables, and circuits when present). From/to is on the line below.
+- Where a trace continues on another page, a chevron marker is a cell of the grid like any block:
+  the first cell of a continuing page ("Continued from page N") and the last cell of a page that
+  continues ("Continues on page N"). It names the equipment and port on the other side and its
+  site and rack. The cable that crosses the break is drawn, and named, on both pages.
 - Block = a parent object (device, circuit, provider network, site) with the ports the path uses on
   it, as in NetBox's own trace drawing.
 
@@ -36,3 +41,12 @@ cable, with the cable drawn between them like any other. The marker says where t
 from or to (site, device and port). A path that leaves the scope and returns prints as separate
 segments ("Segment 1 of 2"). Sketch from the author: a 190 x 50 chevron, a 90-unit gap, then a
 120 x 60 block, all on one centre line.
+
+## Extending a trace (planned)
+
+Add the connections around the equipment at either end of the traced connection. If circuit X runs
+A - B - C - D - E, choose an incoming and/or outgoing connection on E (a port with a cable or
+circuit) and add its path as well, giving one printout A - B - C - D - E - f - g - h. The joined
+equipment (E) is drawn once, with the arriving port as "in" and the chosen port as "out", the same
+way a patch panel shows front and rear port. The same can be done at the start (A). The chain model
+already supports this: it is a longer list of blocks and links.

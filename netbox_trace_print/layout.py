@@ -23,6 +23,8 @@ from .pdf.writer import Document
 PAD = 4.0          # inside a block
 GUTTER = 14.0      # left and right of the grid, where the return lines run
 RET_PAD = 12.0     # clear space between a return line and the blocks above and below it
+TIP = 12.0         # depth of the chevron's point and notch
+CHEV_MIN_H = 44.0  # a chevron marker is never lower than this
 LINE_BLACK = 0
 SOFT = 0.28        # captions and secondary text: dark enough to stay readable in black and white
 HEADER_FILL = 0.9
@@ -50,6 +52,7 @@ class LayoutReport:
     warnings: list = field(default_factory=list)
     boxes: list = field(default_factory=list)         # (page, x0, y0, x1, y1) of every text run, for tests
     block_boxes: list = field(default_factory=list)   # the same for every block frame
+    chevron_boxes: list = field(default_factory=list)  # (page, kind, x0, y0, x1, y1, text) of every chevron marker
 
 
 class Metrics:
@@ -179,58 +182,92 @@ class Engine:
 
         label_w = self._label_width(m, bw)
         plans = [self._plan_block(m, b, bw, label_w) for b in doc.blocks]
-        rows = [list(range(i, min(i + n, len(plans)))) for i in range(0, len(plans), n)]
 
-        row_info = []
-        for idxs in rows:
-            hdr = max(plans[i].hdr_h for i in idxs)
-            ports = max(plans[i].ports_h for i in idxs)
-            det = max(plans[i].det_h for i in idxs)
-            conn = hdr + m.lh * 1.5 - 0.1 * size            # connector y, from the top of the row
-            # cable names stand above the in-row connectors, so the connector must be low enough for them
-            for i in idxs[:-1]:
-                conn = max(conn, self._names_h(m, doc.links[i], gw - 6, False) + 4)
-            h = hdr + ports + det
-            # the details hanging under each in-row connector must fit inside the row
-            for i in idxs[:-1]:
-                h = max(h, conn + 4 + self._details_h(m, doc.links[i], gw - 6, False) + PAD)
-            row_info.append({"idxs": idxs, "hdr": hdr, "ports": ports, "det": det, "h": h, "conn": conn})
-
-        # the cable between the last block of a row and the first of the next: name above the line,
-        # details below it, and clear space above and below the whole thing
-        ret_h = {}
-        for r, info in enumerate(row_info[:-1]):
-            link = doc.links[info["idxs"][-1]]
-            ret_h[r] = (RET_PAD + self._names_h(m, link, avail, True) + 6
-                        + self._details_h(m, link, avail, True) + RET_PAD)
-
-        # header and footer heights
         head_first, head_next, foot = self._header_heights(m, content_w)
         top_first, top_next = self.margin + head_first, self.margin + head_next
         bottom = self.page_h - self.margin - foot
 
-        placements, page, y, fits = [], 0, top_first, True
-        for r, info in enumerate(row_info):
-            def need(starts):
-                # the region above a row that continues from the previous page holds one extra caption line
-                cont = ret_h[r - 1] + m.lh if (starts and r > 0) else 0
-                # a row that is followed by a page break needs one extra caption line too, so reserve it
-                # when checking the fit (but only advance by the real gap)
-                return cont, cont + info["h"] + (ret_h[r] + m.lh if r in ret_h else 0)
-            starts = not placements or placements[-1]["page"] != page
-            cont, total = need(starts)
-            if y + total > bottom and placements and placements[-1]["page"] == page:
-                page += 1
-                y = top_next
-                cont, total = need(True)
-            if y + total > bottom:
+        # Pages are built one at a time: take as many blocks as fit. A page that continues an earlier one
+        # starts with a chevron marker (a cell like any other), and one that continues on a later page
+        # ends with one. The cable that crosses the break is drawn on both sides of it.
+        pages, i, fits, total = [], 0, True, len(doc.blocks)
+        while i < total or not pages:
+            p = len(pages)
+            top = top_first if p == 0 else top_next
+            chosen = None
+            for count in range(max(total - i, 1), 0, -1):
+                layout = self._layout_page(m, self._cells(m, i, count, p, bw), n, plans, gw, avail, top, bottom)
+                if layout["fits"]:
+                    chosen = (count, layout)
+                    break
+            if chosen is None:
                 fits = False
-            placements.append({"page": page, "y": y + cont, "cont": cont, "row": r})
-            y += cont + info["h"] + (ret_h[r] if r in ret_h else 0)
-        return {"m": m, "n": n, "bw": bw, "gw": gw, "avail": avail, "plans": plans, "rows": row_info,
-                "ret_h": ret_h, "placements": placements, "fits": fits, "label_w": label_w,
-                "top_first": top_first, "top_next": top_next, "bottom": bottom, "pages": page + 1,
-                "head_first": head_first, "head_next": head_next, "foot": foot}
+                chosen = (1, layout)
+            pages.append(chosen[1])
+            i += chosen[0]
+        return {"m": m, "n": n, "bw": bw, "gw": gw, "avail": avail, "plans": plans, "pages_layout": pages,
+                "fits": fits, "label_w": label_w, "pages": len(pages), "foot": foot}
+
+    # -- pages made of cells ---------------------------------------------------
+
+    def _chevron(self, m, kind, neighbour, page, bw):
+        """A chevron marker. `neighbour` is the block on the other side of the page break."""
+        blk = self.doc.blocks[neighbour]
+        if kind == "in":
+            caption = f"Continued from page {page}"
+            port = blk.ports[-1].out_name if blk.ports else ""
+        else:
+            caption = f"Continues on page {page + 2}"
+            port = blk.ports[0].in_name if blk.ports else ""
+        text_w = bw - 2 * TIP - 2 * PAD
+        lines = [(t, True, 0) for t in m.wrap(caption, text_w, True)]
+        lines += [(t, True, 0) for t in m.wrap(f"{blk.title} : {port}" if port else blk.title, text_w, True)]
+        place = " · ".join(x for x in (blk.site, blk.rack) if x)
+        if place:
+            lines += [(t, False, SOFT) for t in m.wrap(place, text_w)]
+        return {"kind": kind, "idx": neighbour, "lines": lines, "out": neighbour if kind == "in" else None,
+                "h": max(CHEV_MIN_H, len(lines) * m.lh + 2 * PAD)}
+
+    def _cells(self, m, first, count, page, bw):
+        total = len(self.doc.blocks)
+        cells = [self._chevron(m, "in", first - 1, page, bw)] if page > 0 else []
+        cells += [{"kind": "block", "idx": j, "out": j if j < total - 1 else None} for j in range(first, first + count)]
+        if first + count < total:
+            cells.append(self._chevron(m, "out", first + count, page, bw))
+        return cells
+
+    def _row_info(self, m, cells, plans, gw):
+        doc = self.doc
+        blocks = [c for c in cells if c["kind"] == "block"]
+        hdr = max((plans[c["idx"]].hdr_h for c in blocks), default=0)
+        ports = max((plans[c["idx"]].ports_h for c in blocks), default=0)
+        det = max((plans[c["idx"]].det_h for c in blocks), default=0)
+        chev_h = max((c["h"] for c in cells if c["kind"] != "block"), default=0)
+        conn = hdr + m.lh * 1.5 - 0.1 * m.size if blocks else 0           # connector y, from the top of the row
+        conn = max(conn, chev_h / 2 + 2)
+        links = [doc.links[a["out"]] for a in cells[:-1]]
+        for link in links:                          # cable names stand above the connector
+            conn = max(conn, self._names_h(m, link, gw - 6, False) + 4)
+        h = max(hdr + ports + det, conn + chev_h / 2 + 2 if chev_h else 0)
+        for link in links:                          # the details hanging under it must fit inside the row
+            h = max(h, conn + 4 + self._details_h(m, link, gw - 6, False) + PAD)
+        return {"cells": cells, "hdr": hdr, "ports": ports, "det": det, "h": h, "conn": conn}
+
+    def _layout_page(self, m, cells, n, plans, gw, avail, top, bottom):
+        doc = self.doc
+        y, rows = top, []
+        chunks = [cells[k:k + n] for k in range(0, len(cells), n)] or [[]]
+        for r, chunk in enumerate(chunks):
+            info = self._row_info(m, chunk, plans, gw)
+            info["y"], info["ret"] = y, 0.0
+            y += info["h"]
+            if r < len(chunks) - 1:                 # the cable from this row's last cell to the next row's first
+                link = doc.links[chunk[-1]["out"]]
+                info["ret"] = (RET_PAD + self._names_h(m, link, avail, True) + 6
+                               + self._details_h(m, link, avail, True) + RET_PAD)
+                y += info["ret"]
+            rows.append(info)
+        return {"rows": rows, "fits": y <= bottom + 1e-6, "cells": cells}
 
     def _label_width(self, m, bw):
         inner = bw - 2 * PAD
@@ -332,14 +369,11 @@ class Engine:
                 f"A row of blocks is taller than a {self.spec.paper} {self.spec.orientation} page at "
                 f"{self.spec.min_size:g} pt. Choose larger paper or fewer fields.")
         pdf = Document(title=doc.title, author="netbox-trace-print")
-        painters = []
-        for p in range(plan["pages"]):
-            canvas = pdf.add_page(self.page_w, self.page_h)
-            painters.append(_Painter(canvas, p, m, report))
-            self._page_chrome(painters[p], plan, p)
-
-        for place in plan["placements"]:
-            self._draw_row(painters, plan, place)
+        for p, page in enumerate(plan["pages_layout"]):
+            pt = _Painter(pdf.add_page(self.page_w, self.page_h), p, m, report)
+            self._page_chrome(pt, plan, p)
+            for r, info in enumerate(page["rows"]):
+                self._draw_row(pt, plan, page["rows"], r)
         return pdf.to_bytes(), report
 
     def _page_chrome(self, pt, plan, p):
@@ -374,62 +408,62 @@ class Engine:
         pt.text(x0, fy + 2, doc.footer, size=7, lh=9, fill=SOFT)
         pt.text(x1, fy + 2, f"Page {p + 1} of {plan['pages']}", True, 7, lh=9, align="right")
 
-    def _draw_row(self, painters, plan, place):
-        m, n, bw, gw, avail = plan["m"], plan["n"], plan["bw"], plan["gw"], plan["avail"]
-        info = plan["rows"][place["row"]]
-        pt = painters[place["page"]]
+    def _draw_row(self, pt, plan, rows, r):
+        m, bw, gw, avail = plan["m"], plan["bw"], plan["gw"], plan["avail"]
+        info = rows[r]
         c, doc = pt.c, self.doc
-        y, h = place["y"], info["h"]
+        y, h = info["y"], info["h"]
         x0 = self.margin + GUTTER
         left_x, right_x = self.margin + GUTTER / 2, self.page_w - self.margin - GUTTER / 2
         conn_y = y + info["conn"]
+        cells = info["cells"]
 
-        for col, i in enumerate(info["idxs"]):
-            self._draw_block(pt, plan, doc.blocks[i], plan["plans"][i], x0 + col * (bw + gw), y, h, info)
+        def cx(col):
+            return x0 + col * (bw + gw)
+
+        for col, cell in enumerate(cells):
+            if cell["kind"] == "block":
+                self._draw_block(pt, plan, doc.blocks[cell["idx"]], plan["plans"][cell["idx"]], cx(col), y, h, info)
+            else:
+                self._draw_chevron(pt, m, cell, cx(col), bw, conn_y)
+
+        def entry(col):                            # where a cable enters a cell: a chevron's notch is inside it
+            return cx(col) + (TIP if cells[col]["kind"] == "out" else 0)
 
         # connectors inside the row: name above the line, details below it
-        for col, i in enumerate(info["idxs"][:-1]):
-            bx = x0 + col * (bw + gw) + bw
-            self._cable_line(c, doc.links[i], [(bx, conn_y), (bx + gw, conn_y)])
-            self._names_above(pt, m, doc.links[i], bx + gw / 2, gw - 6, conn_y - 3, False)
-            self._details_below(pt, m, doc.links[i], bx + 3, conn_y + 4, gw - 6, False)
+        for col in range(len(cells) - 1):
+            link = doc.links[cells[col]["out"]]
+            xa, xb = cx(col) + bw, entry(col + 1)
+            self._cable_line(c, link, [(xa, conn_y), (xb, conn_y)])
+            mid = (xa + cx(col + 1)) / 2
+            self._names_above(pt, m, link, mid, gw - 6, conn_y - 3, False)
+            self._details_below(pt, m, link, xa + 3, conn_y + 4, gw - 6, False)
 
-        # the cable out of this row, back under it and into the first block of the next row (or the next page)
-        r = place["row"]
-        if r in plan["ret_h"]:
-            link = doc.links[info["idxs"][-1]]
-            end_x = x0 + (len(info["idxs"]) - 1) * (bw + gw) + bw
-            names_h = self._names_h(m, link, avail, True)
-            line_y = y + h + RET_PAD + names_h + 3
-            nxt = plan["placements"][r + 1]
-            nxt_info = plan["rows"][r + 1]
-            same_page = nxt["page"] == place["page"]
-            path = [(end_x, conn_y), (right_x, conn_y), (right_x, line_y), (left_x, line_y)]
+        # the cable from this row's last cell, back under the row and into the first cell of the next row
+        if r < len(rows) - 1:
+            link = doc.links[cells[-1]["out"]]
+            nxt = rows[r + 1]
+            end_x = cx(len(cells) - 1) + bw
+            line_y = y + h + RET_PAD + self._names_h(m, link, avail, True) + 3
+            into = nxt["cells"][0]
+            path = [(end_x, conn_y), (right_x, conn_y), (right_x, line_y), (left_x, line_y),
+                    (left_x, nxt["y"] + nxt["conn"]), (x0 + (TIP if into["kind"] == "out" else 0), nxt["y"] + nxt["conn"])]
+            self._cable_line(c, link, path)
             self._names_above(pt, m, link, x0 + avail / 2, avail, line_y - 3, True)
-            if same_page:
-                path += [(left_x, nxt["y"] + nxt_info["conn"]), (x0, nxt["y"] + nxt_info["conn"])]
-                self._cable_line(c, link, path)
-                self._details_below(pt, m, link, x0, line_y + 4, avail, True)
-            else:
-                self._cable_line(c, link, path)
-                c.polygon([(left_x - 4, line_y), (left_x + 4, line_y), (left_x, line_y + 8)], fill=0)
-                self._details_below(pt, m, link, x0, line_y + 4, avail, True)
-                caption_y = line_y + 4 + self._details_h(m, link, avail, True) + 2
-                pt.text(x0 + avail / 2, caption_y, f"Continues on page {nxt['page'] + 1}", True, align="center")
+            self._details_below(pt, m, link, x0, line_y + 4, avail, True)
 
-        # arriving from the previous page
-        if place["cont"]:
-            prev = plan["rows"][r - 1]
-            link = doc.links[prev["idxs"][-1]]
-            top = y - place["cont"]
-            conn = y + info["conn"]
-            self._cable_line(c, link, [(left_x, top), (left_x, conn), (x0, conn)])
-            c.polygon([(left_x - 4, top + 2), (left_x + 4, top + 2), (left_x, top + 9)], fill=0)
-            pt.text(x0 + avail / 2, top + 3, f"Continued from page {plan['placements'][r - 1]['page'] + 1}", True,
-                    align="center")
-            names_h = self._names_h(m, link, avail, True)
-            self._names_above(pt, m, link, x0 + avail / 2, avail, top + 3 + m.lh + names_h, True)
-            self._details_below(pt, m, link, x0, top + 3 + m.lh + names_h + 3, avail, True)
+    def _draw_chevron(self, pt, m, cell, x0, bw, conn_y):
+        """A marker where the trace continues on another page: a chevron pointing in the direction of travel."""
+        h, x1 = cell["h"], x0 + bw
+        top, bottom = conn_y - h / 2, conn_y + h / 2
+        pt.c.polygon([(x0, top), (x1 - TIP, top), (x1, conn_y), (x1 - TIP, bottom), (x0, bottom), (x0 + TIP, conn_y)],
+                     fill=HEADER_FILL, stroke=0, width=1.0)
+        pt.report.chevron_boxes.append((pt.page_no, cell["kind"], x0, top, x1, bottom,
+                                        " ".join(t for t, _b, _f in cell["lines"])))
+        ty = conn_y - len(cell["lines"]) * m.lh / 2
+        for text, bold, fill in cell["lines"]:
+            pt.text(x0 + bw / 2, ty, text, bold, fill=fill, align="center")
+            ty += m.lh
 
     def _cable_line(self, c, link, points):
         for k, cable in enumerate(link.cables):

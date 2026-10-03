@@ -5,6 +5,13 @@ One directory per plugin release, so a layout can be discussed by name and versi
 `samples/<version>/<layout>-<paper>-<orientation>.pdf`
 
 - **full-information**: every field of every block and cable. The first layout.
+- `full-information-nordfiber-*`: real traces from the Nordfiber sample dataset (netbox-sampledata).
+- The others are synthetic (`tests/sample.py`).
 
-Regenerate with `python -m tests.demo_layout` (inside a NetBox container, see
-`run-tests.sh`). The data is synthetic (`tests/sample.py`), not from a real NetBox.
+| Version | What is new in the samples |
+|---|---|
+| 0.1.0 | The first layout |
+| 0.2.0 | Chevron markers where a trace continues on another page |
+
+Regenerate with `python -m tests.demo_layout` (inside a NetBox container, see `run-tests.sh`);
+the real-data ones with `tests/live_render.py`.
