@@ -34,6 +34,9 @@ c.force_login(admin)
 print("== administrator")
 r = c.get("/plugins/trace-print/", HTTP_HOST=HOST)
 check("index 200", r.status_code == 200 and b"Interface" in r.content and b"Circuit termination" in r.content, r.status_code)
+check("the start page is the print page with nothing chosen: hint on the left, picker on the right, no options yet",
+      b"Choose what to trace in the menu on the right" in r.content and b"<object" not in r.content
+      and b'name="paper"' not in r.content and b"order-xl-2" in r.content, r.status_code)
 r = c.get("/plugins/trace-print/interface/", HTTP_HOST=HOST)
 check("picker address redirects to the start page", r.status_code == 302, r.status_code)
 r = c.get(f"/plugins/trace-print/interface/?object={iface.pk}", HTTP_HOST=HOST)

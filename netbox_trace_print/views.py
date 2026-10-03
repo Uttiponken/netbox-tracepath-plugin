@@ -50,9 +50,10 @@ def _pickers(active=None, current=None):
 
 class IndexView(KindPermissionMixin, View):
     def get(self, request):
+        # The start page is the print page with nothing chosen yet: one layout, one place to choose.
         kind = request.GET.get("kind")
-        return render(request, "netbox_trace_print/index.html", {
-            "pickers": _pickers(kind if kind in KINDS else None), "version": __version__})
+        return render(request, "netbox_trace_print/print.html", {
+            "object": None, "pickers": _pickers(kind if kind in KINDS else None), "version": __version__})
 
 
 class PickView(KindPermissionMixin, View):

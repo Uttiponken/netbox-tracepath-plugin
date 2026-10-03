@@ -1,14 +1,21 @@
 {% extends 'base/layout.html' %}
 {% load form_helpers %}
 
-{% block title %}Print trace: {{ object }}{% endblock %}
+{% block title %}Print cable trace{% if object %}: {{ object }}{% endif %}{% endblock %}
 
 {% block content %}
   <div class="row">
 
     {# The PDF preview, on the left #}
     <div class="col-12 col-xl-8 order-2 order-xl-1">
-      {% if not path %}
+      {% if not object %}
+        <div class="card">
+          <div class="card-body text-center text-muted py-5">
+            <i class="mdi mdi-printer mdi-48px"></i>
+            <p class="mb-0">Choose what to trace in the menu on the right.<br>The PDF preview appears here.</p>
+          </div>
+        </div>
+      {% elif not path %}
         <div class="alert alert-warning">No cable path was found for this object, so there is nothing to print.</div>
       {% elif not report.fits %}
         <div class="alert alert-danger">
@@ -34,11 +41,16 @@
       <div class="card">
         <h2 class="card-header">What to trace</h2>
         <div class="card-body">
-          <p class="mb-2"><strong>{{ label }} {{ object }}</strong></p>
+          {% if object %}<p class="mb-2"><strong>{{ label }} {{ object }}</strong></p>{% endif %}
           {% include 'netbox_trace_print/_picker.html' %}
+        </div>
+        <div class="card-footer text-muted small">
+          netbox-trace-print {{ version }} ·
+          <a href="{% url 'plugins:netbox_trace_print:printprofile_list' %}">Print profiles</a>
         </div>
       </div>
 
+      {% if object %}
       <form method="get">
         <input type="hidden" name="custom" value="1">
 
@@ -91,6 +103,7 @@
             {{ report.font_size }} pt text.
           </div>
         </div>
+      {% endif %}
       {% endif %}
     </div>
   </div>
