@@ -5,8 +5,20 @@ and field engineers. Each device on the path is a block, laid out in a grid that
 wraps like text across the page, so a long trace reads A–B–C–D on one row and
 continues E–F–G on the next.
 
-**Status: early development (0.1.0).** The plugin installs and adds a menu entry;
-trace selection and PDF output are being built.
+**Status: early development (0.1.0).** You can pick an interface, front or rear port or circuit
+termination, see its full cable trace as a PDF in the page, and download it. One layout exists so
+far, "full information" (every field of every block and cable). Choosing which fields to print,
+colours by site/rack and scoping a print to one site are next. See `docs/ROADMAP.md`.
+
+## Use
+
+**Plugins → Trace Print → Print cable trace**, choose where to start (Interface, Front port, Rear
+port, Circuit termination), pick the object, then choose paper size and orientation (A4 landscape
+by default). A port that several paths run through (a patch-panel port) offers a choice of path.
+The PDF is shown in the page and can be downloaded. Sample output is in `samples/<version>/`.
+
+You need the stock trace permission (view cables) and view permission on the object type. Objects
+you may not view appear by name only.
 
 ## Goals
 
@@ -29,6 +41,24 @@ the information always fits the chosen paper.
   plugins.
 - **No database model.** No migrations.
 - UTF-8 text throughout.
+
+## Known limits
+
+- Interfaces bridged to another interface are not followed past the bridge.
+- Where a path fans out over several objects at one step, they are shown as one block and only the
+  first is described in detail (the printout says so).
+- A single block taller than a whole page at 7 pt is reported instead of printed.
+- Text is UTF-8, but the bundled font covers Latin, Greek and Cyrillic only.
+
+## Development
+
+```bash
+./run-tests.sh                      # layout and PDF tests, in a throwaway NetBox container
+python -m tests.demo_layout         # regenerate samples/<version>/ (run it in the container)
+```
+
+`tests/live_smoke.py` and `tests/live_render.py` run against a live NetBox with data; see their
+docstrings.
 
 ## Compatibility
 

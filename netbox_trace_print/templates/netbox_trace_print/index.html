@@ -6,10 +6,15 @@
   <div class="card">
     <h2 class="card-header">Print cable trace</h2>
     <div class="card-body">
-      <p>
-        Trace Print {{ version }} is installed. Selecting a trace and producing the PDF
-        is the next development step.
-      </p>
+      <p>Produce a printable PDF of a cable trace. Choose where to start:</p>
+      <div class="d-flex flex-wrap gap-2">
+        {% for slug, label in kinds %}
+          <a class="btn btn-primary" href="{% url 'plugins:netbox_trace_print:pick' kind=slug %}">
+            <i class="mdi mdi-printer"></i> {{ label }}
+          </a>
+        {% endfor %}
+      </div>
     </div>
+    <div class="card-footer text-muted">netbox-trace-print {{ version }}</div>
   </div>
 {% endblock %}

@@ -1,0 +1,17 @@
+{% extends 'base/layout.html' %}
+{% load form_helpers %}
+
+{% block title %}Print trace: {{ label }}{% endblock %}
+
+{% block content %}
+  <form method="get" class="card">
+    <h2 class="card-header">Print cable trace from a {{ label|lower }}</h2>
+    <div class="card-body">
+      {% render_field form.object %}
+    </div>
+    <div class="card-footer text-end">
+      <a class="btn btn-outline-secondary" href="{% url 'plugins:netbox_trace_print:index' %}">Back</a>
+      <button type="submit" class="btn btn-primary">Show trace</button>
+    </div>
+  </form>
+{% endblock %}
