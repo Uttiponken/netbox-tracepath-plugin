@@ -15,6 +15,9 @@
         {% endfor %}
       </div>
     </div>
-    <div class="card-footer text-muted">netbox-trace-print {{ version }}</div>
+    <div class="card-footer text-muted">
+      netbox-trace-print {{ version }} ·
+      <a href="{% url 'plugins:netbox_trace_print:printprofile_list' %}">Print profiles</a>
+    </div>
   </div>
 {% endblock %}

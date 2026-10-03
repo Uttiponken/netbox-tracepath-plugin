@@ -65,9 +65,9 @@ def steps_of(path):
 
 # -- small formatting helpers -------------------------------------------------
 
-def _f(label, value):
+def _f(label, value, key=""):
     value = "" if value is None else str(value).strip()
-    return Field(label, value) if value else None
+    return Field(label, value, key) if value else None
 
 
 def _fields(*items):
@@ -108,25 +108,25 @@ def port_fields(term):
     """Fields shown under a port name inside a block."""
     out = []
     if hasattr(term, "get_type_display") and getattr(term, "type", None):
-        out.append(_f("Type", term.get_type_display()))
+        out.append(_f("Type", term.get_type_display(), "port.type"))
     cls = type(term).__name__
     if cls == "Interface":
-        out.append(_f("Speed", _speed(term.speed)))
-        out.append(_f("Status", "Disabled" if not term.enabled else ""))
-        out.append(_f("Use", "Management only" if term.mgmt_only else ""))
+        out.append(_f("Speed", _speed(term.speed), "port.speed"))
+        out.append(_f("Status", "Disabled" if not term.enabled else "", "port.status"))
+        out.append(_f("Use", "Management only" if term.mgmt_only else "", "port.use"))
     elif cls == "RearPort":
-        out.append(_f("Positions", term.positions if term.positions != 1 else ""))
+        out.append(_f("Positions", term.positions if term.positions != 1 else "", "port.positions"))
     elif cls == "CircuitTermination":
-        out.append(_f("Port speed", _speed(term.port_speed)))
-        out.append(_f("Upstream speed", _speed(term.upstream_speed)))
-        out.append(_f("Cross-connect", term.xconnect_id))
-        out.append(_f("Patch panel", term.pp_info))
-        out.append(_f("Termination", _name(term.termination)))
+        out.append(_f("Port speed", _speed(term.port_speed), "ct.port_speed"))
+        out.append(_f("Upstream speed", _speed(term.upstream_speed), "ct.upstream_speed"))
+        out.append(_f("Cross-connect", term.xconnect_id, "ct.xconnect"))
+        out.append(_f("Patch panel", term.pp_info, "ct.patch_panel"))
+        out.append(_f("Termination", _name(term.termination), "ct.termination"))
     if getattr(term, "module", None):
-        out.append(_f("Module", term.module))
-    out.append(_f("Label", getattr(term, "label", "")))
-    out.append(_f("Description", term.description))
-    out.append(_f("Marked connected", "Yes" if getattr(term, "mark_connected", False) else ""))
+        out.append(_f("Module", term.module, "port.module"))
+    out.append(_f("Label", getattr(term, "label", ""), "port.label"))
+    out.append(_f("Description", term.description, "port.description"))
+    out.append(_f("Marked connected", "Yes" if getattr(term, "mark_connected", False) else "", "port.marked_connected"))
     return _fields(*out)
 
 
@@ -138,8 +138,9 @@ def port_name(term):
 
 def cable_info(cable):
     if not isinstance(cable, Cable):                      # a wireless link
-        fields = _fields(_f("Status", cable.get_status_display()), _f("SSID", getattr(cable, "ssid", "")),
-                         _f("Description", cable.description))
+        fields = _fields(_f("Status", cable.get_status_display(), "cable.status"),
+                         _f("SSID", getattr(cable, "ssid", ""), "cable.type"),
+                         _f("Description", cable.description, "cable.description"))
         return CableInfo(title=f"Wireless {cable}", fields=fields)
     color = (cable.color or "").lower()
     return CableInfo(
@@ -147,13 +148,13 @@ def cable_info(cable):
         color_hex=color,
         color_name=COLOR_NAMES.get(color, f"#{color}" if color else ""),
         fields=_fields(
-            _f("Type", cable.get_type_display() if cable.type else ""),
-            _f("Length", _length(cable.length, cable.length_unit)),
-            _f("Status", cable.get_status_display()),
-            _f("Tenant", _name(cable.tenant)),
-            _f("Description", cable.description),
-            _f("Tags", _tags(cable)),
-            _f("Comments", cable.comments),
+            _f("Type", cable.get_type_display() if cable.type else "", "cable.type"),
+            _f("Length", _length(cable.length, cable.length_unit), "cable.length"),
+            _f("Status", cable.get_status_display(), "cable.status"),
+            _f("Tenant", _name(cable.tenant), "cable.tenant"),
+            _f("Description", cable.description, "cable.description"),
+            _f("Tags", _tags(cable), "cable.tags"),
+            _f("Comments", cable.comments, "cable.comments"),
         ))
 
 
@@ -163,23 +164,24 @@ def _device_block(dev):
     return Block(
         title=dev.name or f"{dt.model} #{dev.pk}",
         subtitle=" · ".join(x for x in (dev.role.name, f"{dt.manufacturer.name} {dt.model}") if x),
+        subtitle_key="device.subtitle",
         kind="device",
         fields=_fields(
-            _f("Status", dev.get_status_display()),
-            _f("Tenant", _name(dev.tenant)),
-            _f("Site", dev.site.name),
-            _f("Region", _path_of(dev.site.region)),
-            _f("Location", _path_of(dev.location)),
-            _f("Rack", _name(dev.rack)),
-            _f("Position", pos),
-            _f("Serial", dev.serial),
-            _f("Asset tag", dev.asset_tag),
-            _f("Platform", _name(dev.platform)),
-            _f("Primary IPv4", dev.primary_ip4),
-            _f("Primary IPv6", dev.primary_ip6),
-            _f("Description", dev.description),
-            _f("Tags", _tags(dev)),
-            _f("Comments", dev.comments),
+            _f("Status", dev.get_status_display(), "device.status"),
+            _f("Tenant", _name(dev.tenant), "device.tenant"),
+            _f("Site", dev.site.name, "device.site"),
+            _f("Region", _path_of(dev.site.region), "device.region"),
+            _f("Location", _path_of(dev.location), "device.location"),
+            _f("Rack", _name(dev.rack), "device.rack"),
+            _f("Position", pos, "device.position"),
+            _f("Serial", dev.serial, "device.serial"),
+            _f("Asset tag", dev.asset_tag, "device.asset_tag"),
+            _f("Platform", _name(dev.platform), "device.platform"),
+            _f("Primary IPv4", dev.primary_ip4, "device.ipv4"),
+            _f("Primary IPv6", dev.primary_ip6, "device.ipv6"),
+            _f("Description", dev.description, "device.description"),
+            _f("Tags", _tags(dev), "device.tags"),
+            _f("Comments", dev.comments, "device.comments"),
         ),
         site=dev.site.name, location=dev.location.name if dev.location else "", rack=dev.rack.name if dev.rack else "")
 
@@ -188,32 +190,34 @@ def _circuit_block(circuit):
     return Block(
         title=circuit.cid,
         subtitle=" · ".join(x for x in (circuit.provider.name, circuit.type.name) if x),
+        subtitle_key="circuit.subtitle",
         kind="circuit",
         fields=_fields(
-            _f("Status", circuit.get_status_display()),
-            _f("Tenant", _name(circuit.tenant)),
-            _f("Provider", circuit.provider.name),
-            _f("Commit rate", _speed(circuit.commit_rate)),
-            _f("Installed", circuit.install_date),
-            _f("Terminates", circuit.termination_date),
-            _f("Description", circuit.description),
-            _f("Tags", _tags(circuit)),
-            _f("Comments", circuit.comments),
+            _f("Status", circuit.get_status_display(), "circuit.status"),
+            _f("Tenant", _name(circuit.tenant), "circuit.tenant"),
+            _f("Provider", circuit.provider.name, "circuit.provider"),
+            _f("Commit rate", _speed(circuit.commit_rate), "circuit.commit_rate"),
+            _f("Installed", circuit.install_date, "circuit.installed"),
+            _f("Terminates", circuit.termination_date, "circuit.terminates"),
+            _f("Description", circuit.description, "circuit.description"),
+            _f("Tags", _tags(circuit), "circuit.tags"),
+            _f("Comments", circuit.comments, "circuit.comments"),
         ))
 
 
 def _site_block(site):
     return Block(
         title=site.name, subtitle="Site", kind="site",
-        fields=_fields(_f("Status", site.get_status_display()), _f("Tenant", _name(site.tenant)),
-                       _f("Region", _path_of(site.region)), _f("Facility", site.facility),
-                       _f("Time zone", site.time_zone), _f("Description", site.description)),
+        fields=_fields(_f("Status", site.get_status_display(), "site.status"), _f("Tenant", _name(site.tenant), "site.tenant"),
+                       _f("Region", _path_of(site.region), "site.region"), _f("Facility", site.facility, "site.facility"),
+                       _f("Time zone", site.time_zone, "site.timezone"), _f("Description", site.description, "site.description")),
         site=site.name)
 
 
 def _provider_network_block(pn):
     return Block(title=pn.name, subtitle=f"Provider network · {pn.provider.name}", kind="provider-network",
-                 fields=_fields(_f("Provider", pn.provider.name), _f("Description", pn.description)))
+                 fields=_fields(_f("Provider", pn.provider.name, "network.provider"),
+                                _f("Description", pn.description, "network.description")))
 
 
 def _restricted_block(obj):
@@ -322,13 +326,15 @@ class Collector:
             row = (block.ports[0] if block.ports else None)
             port = (row.out_name if side == "out" else row.in_name) if row else ""
             return f"{block.title} : {port}" if port else block.title
-        summary = []
+        items = []
         if blocks:
-            summary.append(f"From {end(blocks[0], 'out')}   to   {end(blocks[-1], 'in')}")
+            items.append(("doc.route", f"From {end(blocks[0], 'out')}   to   {end(blocks[-1], 'in')}"))
         state = "complete" if path.is_complete else "incomplete"
-        summary.append(f"{len(cables)} cable{'s' if len(cables) != 1 else ''}{length} · path {state}")
+        items.append(("doc.summary", f"{len(cables)} cable{'s' if len(cables) != 1 else ''}{length} · path {state}"))
+        summary = [text for _key, text in items]
 
         now = timezone.localtime(timezone.now())
         footer = (f"Generated {now:%Y-%m-%d %H:%M} by {self.user.get_username()} · NetBox "
                   f"{settings.RELEASE.full_version} · netbox-trace-print {__version__}")
-        return TraceDoc(title=title, summary=summary, blocks=blocks, links=links, notes=notes, footer=footer)
+        return TraceDoc(title=title, summary=summary, blocks=blocks, links=links, notes=notes, footer=footer,
+                        summary_items=items, footer_items=[("doc.generated", footer)])

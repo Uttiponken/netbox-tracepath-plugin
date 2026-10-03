@@ -1,0 +1,40 @@
+{% extends 'generic/object.html' %}
+
+{% block content %}
+  <div class="row">
+    <div class="col col-md-5">
+      <div class="card">
+        <h2 class="card-header">Print profile</h2>
+        <table class="table table-hover attr-table">
+          <tr><th scope="row">Name</th><td>{{ object.name }}</td></tr>
+          <tr><th scope="row">Description</th><td>{{ object.description|default:"—" }}</td></tr>
+          <tr><th scope="row">Facts shown</th><td>{{ selected }} of {{ total }}</td></tr>
+        </table>
+      </div>
+      {% if stale %}
+        <div class="alert alert-warning mt-3">
+          This profile lists facts this version of the plugin no longer knows, and ignores them:
+          {{ stale|join:", " }}.
+        </div>
+      {% endif %}
+    </div>
+    <div class="col col-md-7">
+      <div class="card">
+        <h2 class="card-header">Facts</h2>
+        <div class="card-body">
+          {% for group in groups %}
+            <h3 class="fs-6 mt-3 mb-1">{{ group.label }}</h3>
+            <ul class="list-unstyled mb-0">
+              {% for label, on in group.items %}
+                <li>
+                  {% if on %}<i class="mdi mdi-checkbox-marked-outline"></i>{% else %}<i class="mdi mdi-checkbox-blank-outline text-muted"></i>{% endif %}
+                  <span{% if not on %} class="text-muted"{% endif %}>{{ label }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock content %}

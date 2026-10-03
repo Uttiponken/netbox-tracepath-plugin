@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 class Field:
     label: str
     value: str
+    key: str = ""      # the catalogue key (fields.py) that decides whether it is printed; "" = always
 
 
 @dataclass
@@ -37,6 +38,7 @@ class PortRow:
 class Block:
     title: str
     subtitle: str = ""
+    subtitle_key: str = ""                     # catalogue key for the subtitle; "" = always shown
     kind: str = "device"                       # device | circuit | provider-network | site
     ports: list = field(default_factory=list)  # PortRow
     fields: list = field(default_factory=list)  # object details, shown as an aligned label/value grid
@@ -68,3 +70,6 @@ class TraceDoc:
     links: list = field(default_factory=list)     # len(blocks) - 1
     notes: list = field(default_factory=list)     # warnings such as "path is split"
     footer: str = ""
+    # The same text as `summary` and `footer`, as (catalogue key, text) so a selection can drop parts.
+    summary_items: list = field(default_factory=list)
+    footer_items: list = field(default_factory=list)

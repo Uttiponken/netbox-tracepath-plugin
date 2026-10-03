@@ -1,15 +1,24 @@
 import re
+from urllib.parse import urlencode
 
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 
+from netbox.views import generic
+from utilities.views import ViewTab  # noqa: F401  (kept for tabs added later)
+
 from . import __version__
 from .collect import KINDS, Collector, describe_path, model_for, paths_through
-from .forms import PrintOptionsForm, pick_form
+from .fields import ALL_KEYS, GROUPS
+from .forms import PrintOptionsForm, PrintProfileForm, pick_form
 from .layout import LayoutSpec, render as render_pdf
+from .models import PrintProfile
+from .selection import apply_selection
+from .tables import PrintProfileTable
 
 
 class KindPermissionMixin(PermissionRequiredMixin):
@@ -44,44 +53,123 @@ def _object(request, kind, pk):
     return get_object_or_404(model_for(kind).objects.restrict(request.user, "view"), pk=pk)
 
 
+def _choose_keys(request, profile):
+    """The facts to print, and what to call the choice in the footer.
+
+    Pressing Apply, or arriving without having customised anything, takes the profile's facts (all facts
+    if there is no profile). Otherwise the ticked boxes win, including none ticked.
+    """
+    base = set(profile.keys) if profile else set(ALL_KEYS)
+    if request.GET.get("custom") and not request.GET.get("apply"):
+        keys = set(request.GET.getlist("fields")) & set(ALL_KEYS)
+    else:
+        keys = base & set(ALL_KEYS)
+    if profile:
+        name = profile.name if keys == (base & set(ALL_KEYS)) else f"{profile.name} (adjusted)"
+    else:
+        name = "All facts" if keys == set(ALL_KEYS) else "Custom selection"
+    return keys, name
+
+
+def _options(request, form):
+    """Each option on its own: a missing or invalid one falls back to its default instead of spoiling the rest."""
+    defaults = {"paper": "A4", "orientation": "landscape", "path": "", "profile": "", "prepared_for": ""}
+    data = {}
+    for name, default in defaults.items():
+        raw = request.GET.get(name, "")
+        try:
+            data[name] = form.fields[name].clean(raw) if raw else default
+        except ValidationError:
+            data[name] = default
+    return data
+
+
 def _prepare(request, kind, pk):
-    """Everything both the print page and the PDF need: object, chosen path, options, the rendered PDF."""
+    """Everything both the print page and the PDF need: object, chosen path, options, facts, the rendered PDF."""
     obj = _object(request, kind, pk)
     paths = paths_through(obj)
-    choices = [(str(p.pk), describe_path(p)) for p in paths]
-    form = PrintOptionsForm(request.GET or None, path_choices=choices)
-    valid = form.is_valid() if request.GET else False
-    data = form.cleaned_data if valid else {"paper": "A4", "orientation": "landscape", "path": ""}
+    profiles = list(PrintProfile.objects.restrict(request.user, "view"))
+    form = PrintOptionsForm(request.GET or None, path_choices=[(str(p.pk), describe_path(p)) for p in paths],
+                            profile_choices=[(str(p.pk), p.name) for p in profiles])
+    data = _options(request, form)
     path = next((p for p in paths if str(p.pk) == data.get("path")), paths[0] if paths else None)
+    profile = next((p for p in profiles if str(p.pk) == data.get("profile")), None)
+    keys, layout_name = _choose_keys(request, profile)
     result = None
     if path:
         doc = Collector(request.user).trace_doc(path, origin_label=str(obj))
+        doc = apply_selection(doc, keys, layout_name=layout_name, prepared_for=data.get("prepared_for", ""))
         pdf, report = render_pdf(doc, LayoutSpec(paper=data["paper"], orientation=data["orientation"]))
         result = {"doc": doc, "pdf": pdf, "report": report}
-    return obj, form, data, path, result
+    return {"obj": obj, "form": form, "data": data, "path": path, "result": result, "keys": keys,
+            "profile": profile, "layout_name": layout_name}
+
+
+def _pdf_query(prep):
+    """The query string that reproduces this exact printout."""
+    data = prep["data"]
+    pairs = [("paper", data["paper"]), ("orientation", data["orientation"])]
+    if prep["path"]:
+        pairs.append(("path", prep["path"].pk))
+    if prep["profile"]:
+        pairs.append(("profile", prep["profile"].pk))
+    if data.get("prepared_for"):
+        pairs.append(("prepared_for", data["prepared_for"]))
+    pairs.append(("custom", 1))
+    pairs += [("fields", k) for k in ALL_KEYS if k in prep["keys"]]
+    return urlencode(pairs)
 
 
 class PrintView(KindPermissionMixin, View):
     def get(self, request, kind, pk):
-        obj, form, data, path, result = _prepare(request, kind, pk)
-        query = request.GET.urlencode()
-        pdf_url = reverse("plugins:netbox_trace_print:pdf", kwargs={"kind": kind, "pk": pk}) + (f"?{query}" if query else "")
+        prep = _prepare(request, kind, pk)
+        result = prep["result"]
+        pdf_url = reverse("plugins:netbox_trace_print:pdf", kwargs={"kind": kind, "pk": pk}) + "?" + _pdf_query(prep)
+        groups = [{"label": label, "items": [(k, l, k in prep["keys"]) for k, l in items]} for _g, label, items in GROUPS]
         return render(request, "netbox_trace_print/print.html", {
-            "object": obj, "kind": kind, "label": KINDS[kind][2], "form": form, "path": path,
+            "object": prep["obj"], "kind": kind, "label": KINDS[kind][2], "form": prep["form"], "path": prep["path"],
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
-            "pdf_url": pdf_url, "version": __version__,
+            "pdf_url": pdf_url, "version": __version__, "groups": groups, "layout_name": prep["layout_name"],
+            "selected": len(prep["keys"]), "total": len(ALL_KEYS),
         })
 
 
 class PdfView(KindPermissionMixin, View):
     def get(self, request, kind, pk):
-        obj, _form, _data, path, result = _prepare(request, kind, pk)
-        if not path:
+        prep = _prepare(request, kind, pk)
+        if not prep["path"]:
             raise Http404("No cable path found for this object.")
+        result = prep["result"]
         if not result["report"].fits:
             return HttpResponse("\n".join(result["report"].warnings), status=422, content_type="text/plain; charset=utf-8")
-        slug = re.sub(r"[^A-Za-z0-9._-]+", "-", str(obj)).strip("-") or "trace"
+        slug = re.sub(r"[^A-Za-z0-9._-]+", "-", str(prep["obj"])).strip("-") or "trace"
         disposition = "attachment" if request.GET.get("download") else "inline"
         response = HttpResponse(result["pdf"], content_type="application/pdf")
         response["Content-Disposition"] = f'{disposition}; filename="trace-{slug}.pdf"'
         return response
+
+
+# -- print profiles (NetBox's generic object views) ------------------------------------------
+
+class PrintProfileListView(generic.ObjectListView):
+    queryset = PrintProfile.objects.all()
+    table = PrintProfileTable
+
+
+class PrintProfileView(generic.ObjectView):
+    queryset = PrintProfile.objects.all()
+
+    def get_extra_context(self, request, instance):
+        chosen = set(instance.keys)
+        known = [{"label": label, "items": [(l, k in chosen) for k, l in items]} for _g, label, items in GROUPS]
+        stale = sorted(chosen - set(ALL_KEYS))
+        return {"groups": known, "stale": stale, "selected": len(chosen & set(ALL_KEYS)), "total": len(ALL_KEYS)}
+
+
+class PrintProfileEditView(generic.ObjectEditView):
+    queryset = PrintProfile.objects.all()
+    form = PrintProfileForm
+
+
+class PrintProfileDeleteView(generic.ObjectDeleteView):
+    queryset = PrintProfile.objects.all()

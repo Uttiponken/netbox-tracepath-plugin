@@ -2,9 +2,10 @@
 
 ## Steps
 
-1. **Printable trace.** Done so far: PDF output (standard library only, UTF-8), the "full
-   information" layout, real traces from NetBox, picker and print pages, chevron markers where a
-   trace continues on another page. To do: choose which fields
+1. **Printable trace.** Done: PDF output (standard library only, UTF-8), the "full information"
+   layout, real traces from NetBox, picker and print pages, chevron markers where a trace continues on
+   another page, and choosing which facts to print by recipient (print profiles, stored in the
+   plugin's own tables). To do: choose which fields
    to print depending on who gets the printout (presets), as a selection at print time.
 2. **Colour by site / location / rack**, so connection points are easy to find, and still fully
    readable in black and white (tint + pattern + text tag, never colour alone).
@@ -14,6 +15,10 @@
 ## Decisions so far
 
 - Generic NetBox fields only; no custom fields; no other plugin's data; no database model.
+- Print profiles are stored in the plugin's own database tables, keyed to nothing in NetBox. A profile
+  could later be tied to NetBox's Contact Roles; that is deliberately not done now.
+- A fact that is hidden is hidden everywhere it could appear (blocks, cables, chevron markers, header,
+  footer). Names, titles, page numbers and markers are always printed.
 - No dependencies. The PDF writer and layout engine are standard library; DejaVu fonts are bundled.
 - Landscape is the primary orientation. Paper size and orientation are chosen when printing. All
   information must fit the chosen paper: text wraps (never cut off), a tall row first gets fewer

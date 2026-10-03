@@ -5,10 +5,10 @@ and field engineers. Each device on the path is a block, laid out in a grid that
 wraps like text across the page, so a long trace reads A–B–C–D on one row and
 continues E–F–G on the next.
 
-**Status: early development (0.1.0).** You can pick an interface, front or rear port or circuit
-termination, see its full cable trace as a PDF in the page, and download it. One layout exists so
-far, "full information" (every field of every block and cable). Choosing which fields to print,
-colours by site/rack and scoping a print to one site are next. See `docs/ROADMAP.md`.
+**Status: early development (0.3.0).** You can pick an interface, front or rear port or circuit
+termination, choose which facts to print (by recipient, using print profiles), see the cable trace as
+a PDF in the page, and download it. Colours by site/rack and scoping a print to one site are next.
+See `docs/ROADMAP.md`.
 
 ## Use
 
@@ -16,6 +16,18 @@ colours by site/rack and scoping a print to one site are next. See `docs/ROADMAP
 port, Circuit termination), pick the object, then choose paper size and orientation (A4 landscape
 by default). A port that several paths run through (a patch-panel port) offers a choice of path.
 The PDF is shown in the page and can be downloaded. Sample output is in `samples/<version>/`.
+
+**What to print.** Pick a *print profile* and press Apply: the boxes below it tick exactly that
+profile's facts. Adjust them for this printout if you like and press Update. Five profiles are
+installed: Full information, Field technician, Network engineer, Facility / colo operator and
+Customer-safe. Names of equipment, ports and cables, the title, page numbers and the chevron markers
+are always printed, and a fact you hide is hidden everywhere (also on the markers). The footer says which
+layout was used ("Layout: Field technician", "(adjusted)" if you changed it), and an optional
+"Prepared for" line goes under the title.
+
+**Managing profiles.** Plugins → Trace Print → Print profiles: add, edit and delete profiles, with
+the usual NetBox change log and permissions (`netbox_trace_print.view/add/change/delete_printprofile`).
+Without view permission on profiles you can still tick facts by hand.
 
 You need the stock trace permission (view cables) and view permission on the object type. Objects
 you may not view appear by name only.
@@ -39,7 +51,10 @@ the information always fits the chosen paper.
 - **Generic fields only.** Standard NetBox data (cables, ports, devices, racks,
   locations, sites, tenants, circuits). No custom fields and no data from other
   plugins.
-- **No database model.** No migrations.
+- **Own tables only.** Print profiles live in two tables of the plugin (`netbox_trace_print_printprofile`
+  and `..._printprofilefield`). They hold no reference to any NetBox object and the migrations depend on
+  nothing in NetBox. Installing runs them like any plugin (`manage.py migrate`, done by NetBox's
+  upgrade script and by netbox-docker on start).
 - UTF-8 text throughout.
 
 ## Known limits
