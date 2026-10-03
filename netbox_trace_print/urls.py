@@ -17,6 +17,8 @@ urlpatterns = [
     path("profiles/<int:pk>/changelog/", ObjectChangeLogView.as_view(), name="printprofile_changelog",
          kwargs={"model": PrintProfile}),
 
+    path("options/<str:kind>/", views.OptionsView.as_view(), name="options"),
+
     path("<str:kind>/", views.PickView.as_view(), name="pick"),
     path("<str:kind>/<int:pk>/", views.PrintView.as_view(), name="print"),
     path("<str:kind>/<int:pk>/pdf/", views.PdfView.as_view(), name="pdf"),

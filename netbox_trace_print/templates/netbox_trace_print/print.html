@@ -15,6 +15,12 @@
             <p class="mb-0">Choose what to trace in the menu on the right.<br>The PDF preview appears here.</p>
           </div>
         </div>
+      {% elif needs_pair %}
+        <div class="alert alert-info">
+          <strong>This cable is a trunk with {{ pair_count }} pairs in use.</strong>
+          Choose which pair to print under <em>Paper &rarr; Pair and direction</em> on the right. A printout follows one
+          pair at a time.
+        </div>
       {% elif not path %}
         <div class="alert alert-warning">No cable path was found for this object, so there is nothing to print.</div>
       {% elif not report.fits %}

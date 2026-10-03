@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -13,7 +13,7 @@ from netbox.views import generic
 from utilities.views import ViewTab  # noqa: F401  (kept for tabs added later)
 
 from . import __version__
-from .collect import KINDS, Collector, describe_path, model_for, paths_through
+from .collect import KINDS, Collector, describe_path, model_for, pair_of, paths_through
 from .extend import Chain
 from . import catalogue
 from .forms import PrintOptionsForm, PrintProfileForm, pick_form
@@ -55,6 +55,18 @@ class IndexView(KindPermissionMixin, View):
         kind = request.GET.get("kind")
         return render(request, "netbox_trace_print/print.html", {
             "object": None, "pickers": _pickers(kind if kind in KINDS else None), "version": __version__})
+
+
+class OptionsView(KindPermissionMixin, View):
+    """JSON for the dropdowns: ports as 'equipment : port', cables with their ends."""
+
+    def get(self, request, kind):
+        from .options import OPTION_KINDS, search
+
+        if kind not in OPTION_KINDS:
+            raise Http404
+        return JsonResponse(search(kind, request.user, request.GET.get("q", ""), request.GET.get("limit"),
+                                   request.GET.get("offset")))
 
 
 class PickView(KindPermissionMixin, View):
@@ -109,10 +121,24 @@ def _prepare(request, kind, pk):
     obj = _object(request, kind, pk)
     paths = paths_through(obj)
     profiles = list(PrintProfile.objects.restrict(request.user, "view"))
-    form = PrintOptionsForm(request.GET or None, path_choices=[(str(p.pk), describe_path(p)) for p in paths],
+    pairs = {}
+    if kind == "cable":                            # a trunk carries several pairs: which one is asked for first
+        for p in paths:
+            pairs.setdefault(pair_of(p, obj) or "", []).append(p)
+    if pairs and "" not in pairs:
+        choices = [(pair, [(str(p.pk), describe_path(p)) for p in group])
+                   for pair, group in sorted(pairs.items(), key=lambda kv: (len(kv[0]), kv[0]))]
+        path_label = "Pair and direction"
+    else:
+        choices, path_label = [(str(p.pk), describe_path(p)) for p in paths], ""
+    form = PrintOptionsForm(request.GET or None, path_choices=choices, path_count=len(paths), path_label=path_label,
                             profile_choices=[(str(p.pk), p.name) for p in profiles])
+    needs_pair = len(pairs) > 1
     data = _options(request, form)
-    path = next((p for p in paths if str(p.pk) == data.get("path")), paths[0] if paths else None)
+    path = next((p for p in paths if str(p.pk) == data.get("path")), None)
+    if path is None and paths and not (needs_pair and not data.get("path")):
+        path = paths[0]
+    needs_pair = needs_pair and path is None
     profile = next((p for p in profiles if str(p.pk) == data.get("profile")), None)
     keys, layout_name = _choose_keys(request, profile)
     result = chain = None
@@ -124,7 +150,8 @@ def _prepare(request, kind, pk):
         pdf, report = render_pdf(doc, LayoutSpec(paper=data["paper"], orientation=data["orientation"]))
         result = {"doc": doc, "pdf": pdf, "report": report}
     return {"obj": obj, "form": form, "data": data, "path": path, "result": result, "keys": keys,
-            "profile": profile, "layout_name": layout_name, "chain": chain}
+            "profile": profile, "layout_name": layout_name, "chain": chain, "needs_pair": needs_pair,
+            "pair_count": len(pairs)}
 
 
 def _pdf_query(prep):
@@ -193,6 +220,7 @@ class PrintView(KindPermissionMixin, View):
             "object": prep["obj"], "kind": kind, "label": KINDS[kind][2], "form": prep["form"], "path": prep["path"],
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
             "pdf_url": pdf_url, "version": __version__, "groups": groups, "layout_name": prep["layout_name"],
+            "needs_pair": prep["needs_pair"], "pair_count": prep["pair_count"],
             "selected": len(prep["keys"]), "total": len(catalogue.all_keys()), "pickers": _pickers(kind, prep["obj"]),
             "ext": _extension(request, prep),
         })
@@ -201,6 +229,9 @@ class PrintView(KindPermissionMixin, View):
 class PdfView(KindPermissionMixin, View):
     def get(self, request, kind, pk):
         prep = _prepare(request, kind, pk)
+        if prep["needs_pair"]:
+            return HttpResponse("This cable is a trunk with several pairs in use: choose which pair to print.",
+                                status=400, content_type="text/plain; charset=utf-8")
         if not prep["path"]:
             raise Http404("No cable path found for this object.")
         result = prep["result"]

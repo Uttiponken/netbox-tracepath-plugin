@@ -77,10 +77,13 @@ from dcim.models import Cable
 cable = Cable.objects.get(label="sto-cbl-00016")
 r = c.get("/plugins/trace-print/", HTTP_HOST=HOST)
 body = r.content.decode()
-check("start page has a button for every kind, including Cable", all(f">{k}<" in body.replace("\n", "").replace(" ", "") or k in body for k in ("Cable", "Interface", "Front port", "Rear port", "Circuit termination")))
-check("one dropdown per kind, below the buttons, on the same page", body.count('data-bs-toggle="pill"') == 5 and body.count('class="tab-pane') == 5, body.count('data-bs-toggle="pill"'))
-check("the dropdowns only ask NetBox for objects that have a cable", body.count("cabled") >= 4)
-check("a kind can be opened directly", 'nav-link border active' in c.get("/plugins/trace-print/?kind=rear-port", HTTP_HOST=HOST).content.decode())
+check("start page has a button for every kind, including Cable and no Rear port", all(k in body for k in ("Cable", "Interface", "Front port", "Circuit termination")) and "Rear port" not in body)
+check("one dropdown per kind, below the buttons, on the same page", body.count('data-bs-toggle="pill"') == 4 and body.count('class="tab-pane') == 4, body.count('data-bs-toggle="pill"'))
+check("the port and cable dropdowns get their options from the plugin (equipment : port)",
+      all(f'data-url="/plugins/trace-print/options/{k}/"' in body for k in ("interface", "front-port", "cable")))
+check("the circuit-termination dropdown only asks NetBox for objects that have a cable", body.count("cabled") >= 1)
+check("a kind can be opened directly", 'nav-link border active' in c.get("/plugins/trace-print/?kind=front-port", HTTP_HOST=HOST).content.decode())
+check("rear ports are no longer a starting point", c.get("/plugins/trace-print/rear-port/", HTTP_HOST=HOST).status_code == 404)
 r = c.get(f"/plugins/trace-print/cable/?object={cable.pk}", HTTP_HOST=HOST)
 check("a cable can be chosen", r.status_code == 302 and r["Location"].endswith(f"/cable/{cable.pk}/"), (r.status_code, r.get("Location")))
 r = c.get(f"/plugins/trace-print/cable/{cable.pk}/", HTTP_HOST=HOST)
@@ -88,12 +91,48 @@ check("print page for a cable offers both directions", r.status_code == 200 and 
 r = c.get(f"/plugins/trace-print/cable/{cable.pk}/pdf/", HTTP_HOST=HOST)
 check("a cable's trace is a pdf", r.status_code == 200 and r.content.startswith(b"%PDF"), r.status_code)
 page = c.get(f"/plugins/trace-print/interface/{iface.pk}/", HTTP_HOST=HOST).content.decode()
-check("the print page has the selectors too, with the current object", "pick-interface" in page and f'value="{iface.pk}"' in page and page.count('action="/plugins/trace-print/') >= 5, page.count("<form"))
+import re as _re2
+check("the selected interface is shown as 'equipment : port'", bool(_re2.search(rf'<option value="{iface.pk}"[^>]*selected[^>]*>\s*polaris-sto-sw-01 : Ethernet49', page)))
+check("the print page has the selectors too, with the current object", "pick-interface" in page and f'value="{iface.pk}"' in page and page.count('action="/plugins/trace-print/') >= 4, page.count("<form"))
 uncabled_if = Interface.objects.filter(cable__isnull=True, mgmt_only=False).first()
 r = c.get(f"/plugins/trace-print/interface/?object={uncabled_if.pk}", HTTP_HOST=HOST)
 check("an object without a cable is refused and sent back", r.status_code == 302 and "?kind=interface" in r["Location"], (r.status_code, r.get("Location")))
 r = c.get("/plugins/trace-print/interface/", HTTP_HOST=HOST)
 check("the old picker address leads back to the start page", r.status_code == 302 and "?kind=interface" in r["Location"])
+
+print("== dropdown options, and trunk cables")
+import json as _json
+from netbox_trace_print.collect import paths_through
+r = c.get("/plugins/trace-print/options/interface/?q=polaris+sw+49", HTTP_HOST=HOST)
+data = _json.loads(r.content)
+check("interface options read 'equipment : port' and are found by either part",
+      r.status_code == 200 and {x["display"] for x in data["results"]} == {"polaris-sto-sw-01 : Ethernet49", "polaris-got-sw-01 : Ethernet49"}, data)
+data = _json.loads(c.get("/plugins/trace-print/options/front-port/?q=sto-patch-mmr+port+1", HTTP_HOST=HOST).content)
+check("front-port options name the panel, so 'Port 1' is no longer ambiguous", "sto-patch-mmr-01 : Port 1" in [x["display"] for x in data["results"]], data["results"][:3])
+allfp = _json.loads(c.get("/plugins/trace-print/options/front-port/?limit=100", HTTP_HOST=HOST).content)
+check("only cabled front ports are offered", allfp["count"] == FrontPort.objects.filter(cable__isnull=False).count()
+      and all(" : " in x["display"] for x in allfp["results"]), allfp["count"])
+data = _json.loads(c.get("/plugins/trace-print/options/cable/?q=sto-cbl-00007", HTTP_HOST=HOST).content)
+check("cable options show the cable's two ends", data["results"][0]["description"] == "sto-mmr-nordfiber-01 : Trunk ↔ sto-patch-mmr-01 : Trunk", data["results"])
+check("options for other kinds do not exist", c.get("/plugins/trace-print/options/rear-port/", HTTP_HOST=HOST).status_code == 404)
+data = _json.loads(c.get("/plugins/trace-print/options/interface/?limit=3&offset=2", HTTP_HOST=HOST).content)
+check("paging works", len(data["results"]) == 3 and data["count"] > 3)
+
+trunk = Cable.objects.get(label="sto-cbl-00007")           # the MeetMe trunk: four pairs in use
+page = c.get(f"/plugins/trace-print/cable/{trunk.pk}/", HTTP_HOST=HOST).content.decode()
+check("a trunk with several pairs asks which pair first, and shows no preview",
+      "trunk with 4 pairs in use" in page and "<object" not in page)
+check("the choice is grouped by pair, both directions each",
+      all(f'<optgroup label="Pair {n}">' in page for n in (1, 2, 3, 4)) and page.count("→") >= 8 and "Pair and direction" in page)
+r = c.get(f"/plugins/trace-print/cable/{trunk.pk}/pdf/", HTTP_HOST=HOST)
+check("its pdf is refused until a pair is chosen", r.status_code == 400, r.status_code)
+tpaths = paths_through(trunk)
+r = c.get(f"/plugins/trace-print/cable/{trunk.pk}/pdf/?path={tpaths[0].pk}", HTTP_HOST=HOST)
+check("a chosen pair prints", r.status_code == 200 and r.content.startswith(b"%PDF"), r.status_code)
+check("and the page then shows the preview", b"<object" in c.get(f"/plugins/trace-print/cable/{trunk.pk}/?path={tpaths[0].pk}", HTTP_HOST=HOST).content)
+single = Cable.objects.get(label="bb-cbl-00001")           # one pair in use
+page = c.get(f"/plugins/trace-print/cable/{single.pk}/", HTTP_HOST=HOST).content.decode()
+check("a trunk with one pair in use needs no choice", "<object" in page and "pairs in use" not in page)
 
 print("== print profiles and the choice of facts")
 from netbox_trace_print.fields import ALL_KEYS, PROFILES

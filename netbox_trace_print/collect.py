@@ -26,7 +26,6 @@ KINDS = {
     "cable": ("dcim", "cable", "Cable"),
     "interface": ("dcim", "interface", "Interface"),
     "front-port": ("dcim", "frontport", "Front port"),
-    "rear-port": ("dcim", "rearport", "Rear port"),
     "circuit-termination": ("circuits", "circuittermination", "Circuit termination"),
 }
 
@@ -69,6 +68,20 @@ def describe_path(path, reverse=False):
     cables = sum(1 for _near, links, _far in steps for _l in links)
     left, right = (target.replace(" (not connected further)", ""), origins) if reverse else (origins, target)
     return f"{left} → {right}  ·  {cables} cable{'s' if cables != 1 else ''}"
+
+
+def pair_of(path, cable):
+    """Which pair of a trunk the path uses: the front port next to the trunk's rear port ('Port 3' -> 'Pair 3')."""
+    objs = list(path.path_objects)
+    for i, group in enumerate(objs):
+        if any(type(x).__name__ == "Cable" and x.pk == cable.pk for x in group):
+            for j in (i - 2, i + 2):
+                for x in objs[j] if 0 <= j < len(objs) else []:
+                    if type(x).__name__ == "FrontPort":
+                        digits = "".join(ch for ch in x.name.split()[-1] if ch.isdigit())
+                        return f"Pair {digits}" if digits else x.name
+            return None
+    return None
 
 
 def steps_of(path):
