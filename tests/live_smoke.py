@@ -26,7 +26,7 @@ def check(name, ok, detail=""):
 
 admin = User.objects.get(username="demo-loader")
 iface = Interface.objects.get(device__name="polaris-sto-sw-01", name="Ethernet49")
-fp = FrontPort.objects.get(device__name="sto-patch-01", name="Port 4")
+fp = FrontPort.objects.get(device__name="sto-patch-mmr-01", name="Port 1")
 ct = CircuitTermination.objects.get(circuit__cid="NF-BRG-0001", term_side="Z")
 
 c = Client()
@@ -172,8 +172,8 @@ doc = Collector(admin).trace_doc(paths_through(dcp)[0])
 facts = {f.key: f.value for f in all_fields(doc) if f.key.startswith(("fms.", "wdm."))}
 check("both integrations are installed and active here", set(integrations.active()) == {"fms", "wdm"}, integrations.active())
 check("the catalogue offers both groups", {"fms", "wdm"} <= {g for g, _l, _i in catalogue.groups()})
-check("a cable shows its fiber-plant record", facts.get("fms.type") == "Corning ALTOS Loose Tube 24F SM" and facts.get("fms.serial", "").startswith("CNG-ALTOS24-")
-      and "24 · loose tube" in facts.get("fms.fibers", "") and facts.get("fms.marks", "").startswith("0 – ") and "m" in facts.get("fms.marks", ""), facts)
+check("a cable shows its fiber-plant record", facts.get("fms.type") == "Corning ALTOS Loose Tube 48F SM" and facts.get("fms.serial", "").startswith("CNG-ALTOS24-")
+      and "48 · loose tube" in facts.get("fms.fibers", "") and facts.get("fms.marks", "").startswith("0 – ") and "m" in facts.get("fms.marks", ""), facts)
 check("the install date and installer are shown", any(f.key == "fms.installed" and "20" in f.value for f in all_fields(doc)))
 check("a muxponder port shows channel, wavelength and service", facts.get("wdm.channel", "").startswith("C22 (") and "Baltic Retail Group Backup" in facts.get("wdm.service", ""), facts)
 check("a muxponder block says it is a WDM node", any(f.key == "wdm.node" for b in doc.blocks for f in b.fields))
