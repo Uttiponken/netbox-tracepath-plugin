@@ -40,6 +40,8 @@ r = c.get(f"/plugins/trace-print/interface/?object={iface.pk}", HTTP_HOST=HOST)
 check("picker redirects to the print page", r.status_code == 302 and r["Location"].endswith(f"/interface/{iface.pk}/"), (r.status_code, r.get("Location")))
 r = c.get(f"/plugins/trace-print/interface/{iface.pk}/", HTTP_HOST=HOST)
 check("print page 200 embeds the pdf", r.status_code == 200 and b"application/pdf" in r.content and b"/pdf/" in r.content, r.status_code)
+check("the preview is on the left (first in the page), the options on the right",
+      r.content.index(b"<object") < r.content.index(b'name="paper"') and b"order-xl-1" in r.content.split(b"<object")[0][-400:])
 r = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/", HTTP_HOST=HOST)
 check("pdf is a pdf, inline", r.status_code == 200 and r.content.startswith(b"%PDF") and r["Content-Type"] == "application/pdf"
       and r["Content-Disposition"].startswith("inline"), (r.status_code, r.get("Content-Disposition")))
