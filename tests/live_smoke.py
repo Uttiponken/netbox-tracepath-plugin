@@ -54,6 +54,10 @@ r = c.get(f"/plugins/trace-print/front-port/{fp.pk}/", HTTP_HOST=HOST)
 check("front port with two paths offers a path choice", r.status_code == 200 and b"name=\"path\"" in r.content and b"type=\"hidden\"" not in r.content.split(b"name=\"path\"")[0][-200:], r.status_code)
 paths = fp.cable and __import__("netbox_trace_print.collect", fromlist=["x"]).paths_through(fp)
 check("front port really has 2 paths", len(paths) == 2, len(paths))
+page = c.get(f"/plugins/trace-print/front-port/{fp.pk}/", HTTP_HOST=HOST).content.decode()
+check("the two directions are named by equipment and port, in both orders",
+      "polaris-sto-sw-01 : Ethernet49 → sto-sw-01 : Ethernet2" in page and "sto-sw-01 : Ethernet2 → polaris-sto-sw-01 : Ethernet49" in page
+      and "5 cables" in page, [l for l in page.splitlines() if "→" in l][:3])
 r = c.get(f"/plugins/trace-print/front-port/{fp.pk}/pdf/?path={paths[1].pk}", HTTP_HOST=HOST)
 check("second path renders", r.status_code == 200 and r.content.startswith(b"%PDF"))
 r = c.get(f"/plugins/trace-print/circuit-termination/{ct.pk}/pdf/", HTTP_HOST=HOST)

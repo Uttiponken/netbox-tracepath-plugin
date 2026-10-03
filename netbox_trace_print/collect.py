@@ -48,10 +48,24 @@ def paths_through(instance):
     return list(CablePath.objects.filter(_nodes__contains=instance))
 
 
+def end_label(term):
+    """'equipment : port' for a termination, so two paths through the same cable can be told apart."""
+    parent = getattr(term, "parent_object", None) or term
+    owner = getattr(parent, "name", None) or getattr(parent, "cid", None) or str(parent)
+    return f"{owner} : {port_name(term)}" if hasattr(term, "term_side") or hasattr(term, "name") else str(term)
+
+
 def describe_path(path):
-    origins = ", ".join(str(o) for o in path.origins)
-    dests = ", ".join(str(d) for d in path.destinations) or "incomplete"
-    return f"{origins} → {dests}"
+    """How a path is named in the dropdown: 'from equipment : port to equipment : port', and how long it is."""
+    steps = steps_of(path)
+    origins = ", ".join(end_label(o) for o in path.origins)
+    if path.destinations:
+        target = ", ".join(end_label(d) for d in path.destinations)
+    else:                                       # incomplete: say where it stops
+        last = next((far or near for near, _links, far in reversed(steps) if far or near), [])
+        target = (", ".join(end_label(t) for t in last) if last else "?") + " (not connected further)"
+    cables = sum(1 for _near, links, _far in steps for _l in links)
+    return f"{origins} → {target}  ·  {cables} cable{'s' if cables != 1 else ''}"
 
 
 def steps_of(path):
