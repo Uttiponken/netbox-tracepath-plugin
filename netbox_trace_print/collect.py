@@ -23,6 +23,7 @@ from .model import Block, Cable as CableInfo, Field, Link, PortRow, TraceDoc
 
 # kind (URL segment) -> (app label, model name, label shown to people)
 KINDS = {
+    "cable": ("dcim", "cable", "Cable"),
     "interface": ("dcim", "interface", "Interface"),
     "front-port": ("dcim", "frontport", "Front port"),
     "rear-port": ("dcim", "rearport", "Rear port"),

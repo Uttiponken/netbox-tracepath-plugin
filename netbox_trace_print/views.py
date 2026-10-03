@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlencode
 
+from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse
@@ -35,18 +36,35 @@ class KindPermissionMixin(PermissionRequiredMixin):
         return user.is_authenticated and all(user.has_perm(p) for p in perms)
 
 
+def _pickers(active=None, current=None):
+    """One selector per kind of object, for the buttons and dropdown at the top of the pages.
+
+    `current` is the object being printed: its selector shows it, so you can switch to another one.
+    """
+    out = []
+    for slug, (_a, _m, label) in KINDS.items():
+        initial = {"object": current.pk} if current is not None and slug == active else None
+        out.append({"slug": slug, "label": label, "form": pick_form(slug)(initial=initial), "active": slug == active})
+    return out
+
+
 class IndexView(KindPermissionMixin, View):
     def get(self, request):
-        kinds = [(slug, label) for slug, (_a, _m, label) in KINDS.items()]
-        return render(request, "netbox_trace_print/index.html", {"kinds": kinds, "version": __version__})
+        kind = request.GET.get("kind")
+        return render(request, "netbox_trace_print/index.html", {
+            "pickers": _pickers(kind if kind in KINDS else None), "version": __version__})
 
 
 class PickView(KindPermissionMixin, View):
+    """Where the selectors submit to: on to the print page, or back to the start if nothing valid was chosen."""
+
     def get(self, request, kind):
         form = pick_form(kind)(request.GET or None)
         if form.is_valid():
             return redirect(reverse("plugins:netbox_trace_print:print", kwargs={"kind": kind, "pk": form.cleaned_data["object"].pk}))
-        return render(request, "netbox_trace_print/pick.html", {"form": form, "kind": kind, "label": KINDS[kind][2]})
+        if request.GET.get("object"):
+            messages.error(request, "That object has no cable, so there is no trace to print.")
+        return redirect(reverse("plugins:netbox_trace_print:index") + f"?kind={kind}")
 
 
 def _object(request, kind, pk):
@@ -130,7 +148,7 @@ class PrintView(KindPermissionMixin, View):
             "object": prep["obj"], "kind": kind, "label": KINDS[kind][2], "form": prep["form"], "path": prep["path"],
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
             "pdf_url": pdf_url, "version": __version__, "groups": groups, "layout_name": prep["layout_name"],
-            "selected": len(prep["keys"]), "total": len(ALL_KEYS),
+            "selected": len(prep["keys"]), "total": len(ALL_KEYS), "pickers": _pickers(kind, prep["obj"]),
         })
 
 

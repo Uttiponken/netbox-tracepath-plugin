@@ -8,10 +8,18 @@ from .pdf.paper import ORIENTATIONS, PAPER_MM
 
 
 def pick_form(kind):
-    """A form with one object selector for the chosen kind of object."""
+    """A form with one object selector for the chosen kind of object.
+
+    Only objects that have a cable are offered: the others have no trace to print. The same filter goes to
+    NetBox's API for the dropdown (a cheap check on the cable column) and to the form's own validation.
+    """
     model = model_for(kind)
+    cabled = kind != "cable"
     return type("PickForm", (forms.Form,), {
-        "object": DynamicModelChoiceField(queryset=model.objects.all(), label=KINDS[kind][2], required=True),
+        "object": DynamicModelChoiceField(
+            queryset=model.objects.filter(cable__isnull=False) if cabled else model.objects.all(),
+            query_params={"cabled": "true"} if cabled else {}, label=KINDS[kind][2], required=True,
+            help_text="Only objects with a cable are listed." if cabled else ""),
     })
 
 

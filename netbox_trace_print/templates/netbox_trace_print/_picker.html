@@ -1,0 +1,22 @@
+{% load form_helpers %}
+{# The kinds of object to start a trace from, as buttons, with a dropdown for the chosen kind below them. #}
+<ul class="nav nav-pills gap-1 mb-3" role="tablist">
+  {% for p in pickers %}
+    <li class="nav-item" role="presentation">
+      <button type="button" class="nav-link border{% if p.active %} active{% endif %}" data-bs-toggle="pill"
+              data-bs-target="#pick-{{ p.slug }}" role="tab" aria-selected="{% if p.active %}true{% else %}false{% endif %}">
+        <i class="mdi mdi-printer"></i> {{ p.label }}
+      </button>
+    </li>
+  {% endfor %}
+</ul>
+<div class="tab-content">
+  {% for p in pickers %}
+    <div class="tab-pane{% if p.active %} show active{% endif %}" id="pick-{{ p.slug }}" role="tabpanel">
+      <form method="get" action="{% url 'plugins:netbox_trace_print:pick' kind=p.slug %}">
+        {% render_field p.form.object %}
+        <button type="submit" class="btn btn-primary">Show trace</button>
+      </form>
+    </div>
+  {% endfor %}
+</div>

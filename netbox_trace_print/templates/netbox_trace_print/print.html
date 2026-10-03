@@ -4,33 +4,46 @@
 {% block title %}Print trace: {{ object }}{% endblock %}
 
 {% block content %}
-  <form method="get">
-    <input type="hidden" name="custom" value="1">
-    <div class="row">
-      <div class="col-12 col-xl-8 order-2 order-xl-1">
-        {% if not path %}
-          <div class="alert alert-warning">No cable path was found for this object, so there is nothing to print.</div>
-        {% elif not report.fits %}
-          <div class="alert alert-danger">
-            <strong>This trace does not fit on the chosen paper.</strong>
-            {% for w in report.warnings %}<div>{{ w }}</div>{% endfor %}
+  <div class="row">
+
+    {# The PDF preview, on the left #}
+    <div class="col-12 col-xl-8 order-2 order-xl-1">
+      {% if not path %}
+        <div class="alert alert-warning">No cable path was found for this object, so there is nothing to print.</div>
+      {% elif not report.fits %}
+        <div class="alert alert-danger">
+          <strong>This trace does not fit on the chosen paper.</strong>
+          {% for w in report.warnings %}<div>{{ w }}</div>{% endfor %}
+        </div>
+      {% else %}
+        <object data="{{ pdf_url }}" type="application/pdf" style="width: 100%; height: 85vh;">
+          <div class="alert alert-info">
+            Your browser cannot show PDFs inline. <a href="{{ pdf_url }}">Open the PDF</a>.
           </div>
-        {% else %}
-          <object data="{{ pdf_url }}" type="application/pdf" style="width: 100%; height: 85vh;">
-            <div class="alert alert-info">
-              Your browser cannot show PDFs inline. <a href="{{ pdf_url }}">Open the PDF</a>.
-            </div>
-          </object>
-          <div class="mt-2 text-end">
-            <a class="btn btn-primary" href="{{ pdf_url }}&download=1">
-              <i class="mdi mdi-download"></i> Download PDF
-            </a>
-          </div>
-        {% endif %}
+        </object>
+        <div class="mt-2 text-end">
+          <a class="btn btn-primary" href="{{ pdf_url }}&download=1">
+            <i class="mdi mdi-download"></i> Download PDF
+          </a>
+        </div>
+      {% endif %}
+    </div>
+
+    {# What to trace and how to print it, on the right #}
+    <div class="col-12 col-xl-4 mb-3 order-1 order-xl-2">
+      <div class="card">
+        <h2 class="card-header">What to trace</h2>
+        <div class="card-body">
+          <p class="mb-2"><strong>{{ label }} {{ object }}</strong></p>
+          {% include 'netbox_trace_print/_picker.html' %}
+        </div>
       </div>
-      <div class="col-12 col-xl-4 mb-3 order-1 order-xl-2">
-        <div class="card">
-          <h2 class="card-header">{{ label }} {{ object }}</h2>
+
+      <form method="get">
+        <input type="hidden" name="custom" value="1">
+
+        <div class="card mt-3">
+          <h2 class="card-header">Paper</h2>
           <div class="card-body">
             {% render_field form.paper %}
             {% render_field form.orientation %}
@@ -38,7 +51,6 @@
             {% render_field form.prepared_for %}
           </div>
           <div class="card-footer text-end">
-            <a class="btn btn-outline-secondary" href="{% url 'plugins:netbox_trace_print:pick' kind=kind %}">Another</a>
             <button type="submit" class="btn btn-primary">Update</button>
           </div>
         </div>
@@ -70,17 +82,16 @@
             <button type="submit" class="btn btn-primary">Update</button>
           </div>
         </div>
+      </form>
 
-        {% if report %}
-          <div class="card mt-3">
-            <div class="card-body small">
-              {{ report.pages }} page{{ report.pages|pluralize }}, {{ report.columns }} column{{ report.columns|pluralize }},
-              {{ report.font_size }} pt text.
-            </div>
+      {% if report %}
+        <div class="card mt-3">
+          <div class="card-body small">
+            {{ report.pages }} page{{ report.pages|pluralize }}, {{ report.columns }} column{{ report.columns|pluralize }},
+            {{ report.font_size }} pt text.
           </div>
-        {% endif %}
-      </div>
-
+        </div>
+      {% endif %}
     </div>
-  </form>
+  </div>
 {% endblock %}

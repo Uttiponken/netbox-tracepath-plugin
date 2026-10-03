@@ -12,10 +12,13 @@ See `docs/ROADMAP.md`.
 
 ## Use
 
-**Plugins → Trace Print → Print cable trace**, choose where to start (Interface, Front port, Rear
-port, Circuit termination), pick the object, then choose paper size and orientation (A4 landscape
-by default). A port that several paths run through (a patch-panel port) offers a choice of path.
-The PDF is shown in the page and can be downloaded. Sample output is in `samples/<version>/`.
+**Plugins → Trace Print → Print cable trace**. Buttons for the kinds of starting point (Cable,
+Interface, Front port, Rear port, Circuit termination) sit at the top; picking one opens a dropdown
+below them on the same page. Only objects that have a cable are listed, since the others have no trace.
+On the print page the same buttons and dropdown stay at the top of the menu on the right, so you can
+switch to another object at any time; the PDF preview is on the left. Choose paper size and
+orientation (A4 landscape by default). A port or cable that several paths run through offers a choice
+of path. The PDF is shown in the page and can be downloaded. Sample output is in `samples/<version>/`.
 
 **What to print.** Pick a *print profile* and press Apply: the boxes below it tick exactly that
 profile's facts. Adjust them for this printout if you like and press Update. Five profiles are
