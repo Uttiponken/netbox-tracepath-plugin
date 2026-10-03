@@ -174,7 +174,8 @@ def port_name(term):
     return term.name
 
 
-def cable_info(cable):
+def cable_info(cable, ports=()):
+    """`ports`: the front ports on either side of the cable in this trace, for facts that depend on the pair it carries."""
     if not isinstance(cable, Cable):                      # a wireless link
         fields = _fields(_f("Status", cable.get_status_display(), "cable.status"),
                          _f("SSID", getattr(cable, "ssid", ""), "cable.type"),
@@ -193,7 +194,7 @@ def cable_info(cable):
             _f("Description", cable.description, "cable.description"),
             _f("Tags", _tags(cable), "cable.tags"),
             _f("Comments", cable.comments, "cable.comments"),
-        ) + integrations.cable_facts(cable))
+        ) + integrations.cable_facts(cable, ports))
 
 
 def _device_block(dev):
@@ -322,7 +323,8 @@ class Collector:
                 io[id(cur)] = {"in": [], "out": []}
             io[id(cur)]["out"] += [t for t in near if self.visible(t)] if k else list(near)
             if far:
-                links.append(Link([cable_info(c) for c in link_objs if self.visible(c)]
+                around = (list(steps[k - 1][2]) if k else []) + (list(steps[k + 1][0]) if k + 1 < len(steps) else [])
+                links.append(Link([cable_info(c, around) for c in link_objs if self.visible(c)]
                                   or [CableInfo(title="Cable (restricted)")] if link_objs else []))
                 nxt = self._new_block(far, [])
                 blocks.append(nxt)

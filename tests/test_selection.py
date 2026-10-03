@@ -143,13 +143,38 @@ class PluginGroupTests(unittest.TestCase):
         for name, (group, label, items) in PLUGIN_GROUPS.items():
             self.assertTrue(all(k.startswith(group + ".") for k, _l in items), name)
 
-    def test_the_keys_the_migration_adds_all_exist_in_the_catalogue(self):
+    def test_the_keys_the_migrations_add_all_exist_in_the_catalogue(self):
         import importlib.util
-        spec = importlib.util.spec_from_file_location("m3", "netbox_trace_print/migrations/0003_plugin_facts_in_profiles.py")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
         from netbox_trace_print.fields import PLUGIN_KEYS
-        for name, keys in module.ADD.items():
-            self.assertFalse(set(keys) - set(PLUGIN_KEYS), f"{name}: {set(keys) - set(PLUGIN_KEYS)}")
-        self.assertEqual(set(module.ADD["Full information"]), set(PLUGIN_KEYS))
-        self.assertNotIn("Customer-safe", module.ADD)
+        added = set()
+        for number, file in (("m3", "0003_plugin_facts_in_profiles"), ("m4", "0004_strand_and_circuit_facts")):
+            spec = importlib.util.spec_from_file_location(number, f"netbox_trace_print/migrations/{file}.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            for name, keys in module.ADD.items():
+                self.assertFalse(set(keys) - set(PLUGIN_KEYS), f"{name}: {set(keys) - set(PLUGIN_KEYS)}")
+            self.assertNotIn("Customer-safe", module.ADD)
+            added |= set(module.ADD["Full information"])
+        self.assertEqual(added, set(PLUGIN_KEYS))      # "Full information" has every plugin fact
+
+
+class FiberColourTests(unittest.TestCase):
+    def test_strand_colours_get_their_fiber_colour_names(self):
+        from netbox_trace_print.integrations.fms import colour_name
+        din = {"ff0000": "red", "00ff00": "green", "0000ff": "blue", "ffff00": "yellow", "ffffff": "white",
+               "708090": "grey", "8b4513": "brown", "ee82ee": "violet", "00ffff": "turquoise", "000000": "black",
+               "ff8000": "orange", "ff69b4": "pink"}
+        for value, name in din.items():
+            self.assertEqual(colour_name(value), name)
+        self.assertEqual(colour_name("#FF0000"), "red")
+        self.assertEqual(colour_name("fe0101"), "red")          # the nearest fiber colour
+        self.assertEqual(colour_name(""), "")
+        self.assertEqual(colour_name("xyz"), "#xyz")
+
+    def test_strands_are_listed_with_tube_fiber_and_colour(self):
+        from types import SimpleNamespace as S
+        from netbox_trace_print.integrations.fms import strand_text
+        self.assertEqual(strand_text([S(name="Tube 1-F3", color="0000ff"), S(name="Tube 1-F4", color="ffff00")]),
+                         "Tube 1-F3 (blue), Tube 1-F4 (yellow)")
+        self.assertEqual(strand_text([S(name="Tube 2-F1", color="")]), "Tube 2-F1")
+        self.assertEqual(strand_text([]), "")

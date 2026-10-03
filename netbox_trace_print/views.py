@@ -116,12 +116,21 @@ def _options(request, form):
     return data
 
 
-def _starting_paths(kind, obj):
-    """The paths to offer for the chosen object: (paths, labels by path id, cable for the pair choice, WDM details)."""
-    if kind == "wdm-circuit":
-        from .integrations import wdm
+SERVICE_KINDS = {"wdm-circuit": "wdm", "fiber-circuit": "fms"}      # starting points that are services, not equipment
 
-        found = wdm.circuit_paths(obj)
+
+def _service(kind):
+    """The integration module that finds a service's paths and trims a trace to it, or None for other kinds."""
+    from .integrations import MODULES
+
+    return MODULES[SERVICE_KINDS[kind]] if kind in SERVICE_KINDS else None
+
+
+def _starting_paths(kind, obj):
+    """The paths to offer for the chosen object: (paths, labels by path id, cable for the pair choice, service details)."""
+    service = _service(kind)
+    if service is not None:
+        found = service.circuit_paths(obj)
         return [f["path"] for f in found], {f["path"].pk: f["label"] for f in found}, None, {f["path"].pk: f for f in found}
     target = obj.cable if kind == "fiber-cable" else obj
     return paths_through(target), {}, (target if kind in ("cable", "fiber-cable") else None), {}
@@ -130,7 +139,7 @@ def _starting_paths(kind, obj):
 def _prepare(request, kind, pk):
     """Everything both the print page and the PDF need: object, chosen path, options, facts, the rendered PDF."""
     obj = _object(request, kind, pk)
-    paths, labels, cable, wdm_entries = _starting_paths(kind, obj)
+    paths, labels, cable, service_entries = _starting_paths(kind, obj)
     name = lambda p: labels.get(p.pk) or describe_path(p)
     profiles = list(PrintProfile.objects.restrict(request.user, "view"))
     pairs = {}
@@ -138,7 +147,7 @@ def _prepare(request, kind, pk):
         for p in paths:
             pairs.setdefault(pair_of(p, cable) or "", []).append(p)
     if pairs and "" not in pairs:
-        choices = [(pair, [(str(p.pk), name(p)) for p in group])
+        choices = [(pair, [(str(p.pk), f"{pair} · {name(p)}") for p in group])
                    for pair, group in sorted(pairs.items(), key=lambda kv: (len(kv[0]), kv[0]))]
         path_label = "Pair and direction"
     else:
@@ -156,10 +165,9 @@ def _prepare(request, kind, pk):
     result = chain = None
     if path:
         collector = Collector(request.user)
-        if kind == "wdm-circuit":                  # a wavelength service stops at its muxponders and is not extended
-            from .integrations import wdm
-
-            doc = wdm.trim_doc(collector.chain_doc([collector.part(path)], origin_label=str(obj)), wdm_entries[path.pk], obj)
+        service = _service(kind)
+        if service is not None:                    # a service stops where it ends and is not extended
+            doc = service.trim_doc(collector.chain_doc([collector.part(path)], origin_label=str(obj)), service_entries[path.pk], obj)
         else:
             chain = Chain(request.user, path, before=request.GET.getlist("before"), after=request.GET.getlist("after"))
             doc = collector.chain_doc(chain.parts(collector), origin_label=str(obj))

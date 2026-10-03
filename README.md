@@ -14,7 +14,7 @@ See `docs/ROADMAP.md`.
 
 **Plugins → Trace Print → Print cable trace**. One page does it all: the PDF preview is on the left (empty until you
 have chosen something) and the menu is on the right. Buttons for the kinds of starting point (Cable,
-Interface, Front port, Circuit termination, and with netbox-wdm / netbox-fms also WDM circuit and Fiber cable) sit at the top; picking one opens a dropdown
+Interface, Front port, Circuit termination, and with netbox-wdm / netbox-fms also WDM circuit, Fiber cable and Fiber circuit) sit at the top; picking one opens a dropdown
 below them on the same page. Only objects that have a cable are listed, since the others have no trace. Ports are listed
 as `equipment : port` (and found by either part) so that many `Port 1` can be told apart, and a cable shows the
 two ends it connects.
@@ -64,14 +64,20 @@ the information always fits the chosen paper.
   upgrade script and by netbox-docker on start).
 - UTF-8 text throughout.
 
-## WDM circuits and fiber cables as starting points
+## WDM circuits, fiber cables and fiber circuits as starting points
 
 With **netbox-wdm** installed, *WDM circuit* lists the wavelength services. A service prints from muxponder to
 muxponder, through the patch panels and trunks between them, and stops there (the client shelf beyond it and
 anything past a regenerator are left out, and the printout says so). It is titled `WDM circuit: <name>`, shows
 the channel and wavelength, and the muxponders show their channel, status and the service. A circuit with two
 directions offers both. With **netbox-fms** installed, *Fiber cable (FMS)* lists the fiber cables and behaves
-like the cable it describes, including the choice of pair for a trunk.
+like the cable it describes, including the choice of pair for a trunk. *Fiber circuit (FMS)* lists the fiber
+circuits. FMS follows a circuit's glass from its origin front port to its destination front port, and the printout
+shows that stretch: from the panel where the circuit starts to the panel where it ends, through every cable and
+MeetMe jumper between them, and nothing beyond (the printout says so). It is titled
+`Fiber circuit: <id> · <name>`, and the header adds the strand count, wavelength and measured loss. A circuit
+offers both directions, like a WDM circuit. In the pair dropdown of a trunk cable, every option starts with its pair
+(`Pair 3 · …`), so it can be told apart even when the group heading is out of sight.
 
 ## Extending a trace
 
@@ -88,7 +94,10 @@ The choices live in the page address (`before=` and `after=`), so a printout can
 If **netbox-fms** is installed, a cable's fiber-plant record is printed on it: fiber cable type, fibers and
 construction, sheath, serial number, install date and installer, route marks, notes. If **netbox-wdm** is
 installed, a muxponder's block says it is a WDM node, and its ports show channel and wavelength, channel
-status, the wavelength service riding on it, and the role of the line port. These facts are choices in the
+status, the wavelength service riding on it, and the role of the line port. A trunk cable also says which
+**strands** the link uses (`Tube 1-F3 (blue), Tube 1-F4 (yellow)`: the tube and fiber to look for and their
+colours, taken from the strands landed on the panel ports beside the cable) and which **fiber circuit** it belongs
+to. These facts are choices in the
 print profiles like any other. Neither plugin is needed: without them the facts and their choices are
 simply absent, and a profile that lists them keeps working. If the other plugin changes in a way this
 plugin does not understand, that part is skipped and logged instead of failing the printout.

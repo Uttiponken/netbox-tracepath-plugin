@@ -79,7 +79,8 @@ r = c.get("/plugins/trace-print/", HTTP_HOST=HOST)
 body = r.content.decode()
 check("start page has a button for every kind, including Cable and no Rear port", all(k in body for k in ("Cable", "Interface", "Front port", "Circuit termination")) and "Rear port" not in body)
 check("one dropdown per kind, below the buttons, on the same page (core kinds plus FMS and WDM)",
-      body.count('data-bs-toggle="pill"') == 6 and body.count('class="tab-pane') == 6 and "WDM circuit" in body and "Fiber cable (FMS)" in body,
+      body.count('data-bs-toggle="pill"') == 7 and body.count('class="tab-pane') == 7 and "WDM circuit" in body
+      and "Fiber cable (FMS)" in body and "Fiber circuit (FMS)" in body,
       body.count('data-bs-toggle="pill"'))
 check("the port and cable dropdowns get their options from the plugin (equipment : port)",
       all(f'data-url="/plugins/trace-print/options/{k}/"' in body for k in ("interface", "front-port", "cable")))
@@ -130,6 +131,8 @@ check("the pair and direction choice sits under the cable dropdown in 'What to t
 check("it has its own button that submits the whole options form", 'type="submit" form="options-form"' in page and 'id="options-form"' in page)
 check("the choice is grouped by pair, both directions each",
       all(f'<optgroup label="Pair {n}">' in page for n in (1, 2, 3, 4)) and page.count("→") >= 8 and "Pair and direction" in page)
+check("every option names its pair, so it still reads right when the group heading is out of sight",
+      all(page.count(f"Pair {n} · ") == 2 for n in (1, 2, 3, 4)), [page.count(f"Pair {n} · ") for n in (1, 2, 3, 4)])
 r = c.get(f"/plugins/trace-print/cable/{trunk.pk}/pdf/", HTTP_HOST=HOST)
 check("its pdf is refused until a pair is chosen", r.status_code == 400, r.status_code)
 tpaths = paths_through(trunk)
@@ -338,6 +341,68 @@ page = c.get(f"/plugins/trace-print/fiber-cable/{fc.pk}/", HTTP_HOST=HOST).conte
 check("a fiber cable behaves like its cable (one pair in use, no choice needed)", "<object" in page and "Fiber cable (FMS)" in page and "pairs in use" not in page)
 fc_mm = FiberCable.objects.filter(cable__label="bb-cbl-00005").first()
 check("the long-haul fiber cables print", c.get(f"/plugins/trace-print/fiber-cable/{fc_mm.pk}/pdf/", HTTP_HOST=HOST).status_code == 200)
+
+print("== FMS fiber circuits as starting points, and the strands a link uses")
+from netbox_fms.models import FiberCircuit
+from netbox_trace_print.integrations import fms as _fms
+
+fcirc = FiberCircuit.objects.get(cid="NF-FC-0002")
+r = c.get("/plugins/trace-print/?kind=fiber-circuit", HTTP_HOST=HOST)
+check("the fiber circuit dropdown asks NetBox for its circuits", "/api/plugins/fms/fiber-circuits/" in r.content.decode())
+r = c.get(f"/plugins/trace-print/fiber-circuit/?object={fcirc.pk}", HTTP_HOST=HOST)
+check("choosing a fiber circuit goes to its print page", r.status_code == 302 and r["Location"].endswith(f"/fiber-circuit/{fcirc.pk}/"), (r.status_code, r.get("Location")))
+page = c.get(f"/plugins/trace-print/fiber-circuit/{fcirc.pk}/", HTTP_HOST=HOST).content.decode()
+check("its two directions are named by panel port and the circuit previews",
+      "sto-patch-osl-01 : Port 1 → osl-patch-sto-01 : Port 1" in page and "osl-patch-sto-01 : Port 1 → sto-patch-osl-01 : Port 1" in page
+      and "<object" in page and "Extend the trace" not in page, page.count("→"))
+entry = _fms.circuit_paths(fcirc)[0]
+d = _fms.trim_doc(col.chain_doc([col.part(entry["path"])]), entry, fcirc)
+check("NF-FC-0002 runs panel to panel over the one trunk, nothing beyond",
+      [b.title for b in d.blocks] == ["sto-patch-osl-01", "osl-patch-sto-01"] and sum(len(l.cables) for l in d.links) == 1, [b.title for b in d.blocks])
+check("  titled, with strands, wavelength and measured loss in the header",
+      d.title == "Fiber circuit: NF-FC-0002 · Stockholm - Oslo, pair 1" and d.summary[0] == "From sto-patch-osl-01 : Port 1 to osl-patch-sto-01 : Port 1"
+      and "fiber circuit · Active · Nordfiber AB" in d.summary[1] and d.summary[2] == "2 strands · 1550 nm · measured loss 95.52 dB", (d.title, d.summary))
+fields = {f.key: f.value for f in d.links[0].cables[0].fields}
+check("  the trunk names its strands and the circuit",
+      fields.get("fms.strands") == "Tube 1-F1 (red), Tube 1-F2 (green)" and fields.get("fms.circuit") == "NF-FC-0002 · Stockholm - Oslo, pair 1", fields)
+nsn = FiberCircuit.objects.get(cid="NF-FC-0004")
+entry = _fms.circuit_paths(nsn)[0]
+d = _fms.trim_doc(col.chain_doc([col.part(entry["path"])]), entry, nsn)
+check("NF-FC-0004 follows the glass through both MeetMe rooms, line panel to line panel",
+      d.blocks[0].title == "sto-patch-mmr-01" and d.blocks[-1].title == "hel-patch-mmr-01" and len(d.blocks) == 6
+      and sum(len(l.cables) for l in d.links) == 5 and not [b for b in d.blocks if "wdm" in b.title or "rtr" in b.title], [b.title for b in d.blocks])
+check("  the NSN trunk in the middle carries pair 1's strands and its fiber record",
+      any(f.key == "fms.strands" and f.value == "Tube 1-F1 (red), Tube 1-F2 (green)" for lk in d.links for cb in lk.cables for f in cb.fields)
+      and any(f.key == "fms.serial" for lk in d.links for cb in lk.cables for f in cb.fields))
+nsn_cable = Cable.objects.get(label="bb-cbl-00005")
+for pair, text in ((2, "Tube 1-F3 (blue), Tube 1-F4 (yellow)"), (7, "Tube 2-F1 (red), Tube 2-F2 (green)")):
+    got = [f.value for f in _fms.cable_facts(nsn_cable, [FrontPort.objects.get(device__name="sto-mmr-nsn-01", name=f"Port {pair}")])
+           if f.key == "fms.strands"]
+    check(f"the strands follow the pair: Port {pair} is strands {2 * pair - 1} and {2 * pair}", got == [text], got)
+check("without a front port beside the cable there is no strand fact",
+      not [f for f in _fms.cable_facts(Cable.objects.get(label="bb-cbl-00005"), []) if f.key in ("fms.strands", "fms.circuit")])
+from netbox_trace_print.selection import apply_selection as _apply
+cs = PrintProfile.objects.get(name="Customer-safe")
+quiet = _apply(d, cs.keys)
+check("a profile without the facts leaves them out (Customer-safe shows no strands, circuit or loss)",
+      not [f for lk in quiet.links for cb in lk.cables for f in cb.fields if f.key.startswith("fms.")] and len(quiet.summary) == 2, quiet.summary)
+tech_keys = set(PrintProfile.objects.get(name="Field technician").keys)
+check("the Field technician profile has the strands and the circuit (migration 0004), not the loss",
+      {"fms.strands", "fms.circuit"} <= tech_keys and "fms.optics" not in tech_keys)
+r = c.get(f"/plugins/trace-print/fiber-circuit/{fcirc.pk}/pdf/", HTTP_HOST=HOST)
+check("a fiber circuit prints as a pdf", r.status_code == 200 and r.content.startswith(b"%PDF"), r.status_code)
+check("every circuit of the dataset has paths to print",
+      all(_fms.circuit_paths(x) for x in FiberCircuit.objects.all()), [x.cid for x in FiberCircuit.objects.all() if not _fms.circuit_paths(x)])
+
+integrations.DISABLED.update({"fms"})
+try:
+    check("without netbox-fms there is no fiber circuit button and the address is unknown",
+          "Fiber circuit (FMS)" not in c.get("/plugins/trace-print/", HTTP_HOST=HOST).content.decode()
+          and c.get(f"/plugins/trace-print/fiber-circuit/{fcirc.pk}/", HTTP_HOST=HOST).status_code == 404)
+    check("and a trace still prints, without the strands",
+          not [f for lk in col.trace_doc(paths_through(trunk)[0]).links for cb in lk.cables for f in cb.fields if f.key.startswith("fms.")])
+finally:
+    integrations.DISABLED.clear()
 
 integrations.DISABLED.update({"wdm"})
 try:

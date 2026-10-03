@@ -54,8 +54,9 @@ def kinds():
     return out
 
 
-def cable_facts(cable):
-    return _gather("cable_facts", cable)
+def cable_facts(cable, ports=()):
+    """`ports` are the front ports on either side of the cable in the trace (which pair or strand it carries here)."""
+    return _gather("cable_facts", cable, ports)
 
 
 def port_facts(term):

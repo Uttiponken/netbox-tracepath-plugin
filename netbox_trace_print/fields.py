@@ -112,7 +112,9 @@ PLUGIN_GROUPS = {
         ("fms.type", "Fiber cable type"), ("fms.fibers", "Fibers and construction"),
         ("fms.sheath", "Sheath and deployment"), ("fms.serial", "Fiber cable serial number"),
         ("fms.installed", "Install date and installer"), ("fms.marks", "Route marks"),
-        ("fms.notes", "Fiber cable notes"),
+        ("fms.notes", "Fiber cable notes"), ("fms.strands", "Strands this link uses (tube, fiber, colour)"),
+        ("fms.circuit", "Fiber circuit this link belongs to"),
+        ("fms.optics", "Fiber circuit printout: strands, wavelength, measured loss"),
     ]),
     "wdm": ("wdm", "Optical (netbox-wdm)", [
         ("wdm.node", "WDM node type and grid"), ("wdm.channel", "Channel and wavelength"),

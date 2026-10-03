@@ -56,5 +56,5 @@ equipment is drawn once with the arriving port as "in" and the chosen port as "o
 ## Optional awareness of other plugins
 
 netbox-fms and netbox-wdm facts are printed when those plugins are installed (0.4.0). WDM circuits and FMS
-fiber cables are starting points (0.5.0). Planned: FMS fiber circuits as starting points (they need data in the
-sample dataset first) and the strand a link uses.
+fiber cables and fiber circuits are starting points, and a trunk cable names the strands and the fiber circuit
+its link uses (0.5.0).
