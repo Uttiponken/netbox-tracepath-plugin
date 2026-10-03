@@ -47,11 +47,13 @@ from or to (site, device and port). A path that leaves the scope and returns pri
 segments ("Segment 1 of 2"). Sketch from the author: a 190 x 50 chevron, a 90-unit gap, then a
 120 x 60 block, all on one centre line.
 
-## Extending a trace (planned)
+## Extending a trace (done in 0.4.0)
 
-Add the connections around the equipment at either end of the traced connection. If circuit X runs
-A - B - C - D - E, choose an incoming and/or outgoing connection on E (a port with a cable or
-circuit) and add its path as well, giving one printout A - B - C - D - E - f - g - h. The joined
-equipment (E) is drawn once, with the arriving port as "in" and the chosen port as "out", the same
-way a patch panel shows front and rear port. The same can be done at the start (A). The chain model
-already supports this: it is a longer list of blocks and links.
+Add the connections around the equipment at either end: if circuit X runs A - B - C - D - E, choose another
+cabled port on E and its path is added (A ... E - f - g - h), at the start too, step by step. The joined
+equipment is drawn once with the arriving port as "in" and the chosen port as "out". See the README.
+
+## Optional awareness of other plugins
+
+netbox-fms and netbox-wdm facts are printed when those plugins are installed (done in 0.4.0). Planned: WDM
+circuits, FMS fiber cables and FMS fiber circuits as starting points, and the strand a link uses.

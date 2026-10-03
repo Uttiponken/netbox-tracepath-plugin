@@ -55,8 +55,10 @@ def end_label(term):
     return f"{owner} : {port_name(term)}" if hasattr(term, "term_side") or hasattr(term, "name") else str(term)
 
 
-def describe_path(path):
-    """How a path is named in the dropdown: 'from equipment : port to equipment : port', and how long it is."""
+def describe_path(path, reverse=False):
+    """How a path is named in the dropdown: 'equipment : port → equipment : port', and how many cables it has.
+
+    `reverse` names it from its far end instead (used for connections that arrive at the equipment)."""
     steps = steps_of(path)
     origins = ", ".join(end_label(o) for o in path.origins)
     if path.destinations:
@@ -65,7 +67,8 @@ def describe_path(path):
         last = next((far or near for near, _links, far in reversed(steps) if far or near), [])
         target = (", ".join(end_label(t) for t in last) if last else "?") + " (not connected further)"
     cables = sum(1 for _near, links, _far in steps for _l in links)
-    return f"{origins} → {target}  ·  {cables} cable{'s' if cables != 1 else ''}"
+    left, right = (target.replace(" (not connected further)", ""), origins) if reverse else (origins, target)
+    return f"{left} → {right}  ·  {cables} cable{'s' if cables != 1 else ''}"
 
 
 def steps_of(path):
@@ -286,26 +289,27 @@ class Collector:
                          f"described in detail.")
         return block
 
-    def trace_doc(self, path, origin_label=""):
-        notes = []
+    def part(self, path, reverse=False):
+        """One path as blocks and links, ready to be joined with others. `reverse` turns it around."""
+        notes = []                                   # (where it applies, text)
         steps = steps_of(path)
         blocks, links, io = [], [], {}
         cur = None
         for k, (near, link_objs, far) in enumerate(steps):
             if k == 0:
-                cur = self._new_block(near, notes)
+                cur = self._new_block(near, [])
                 blocks.append(cur)
                 io[id(cur)] = {"in": [], "out": []}
             io[id(cur)]["out"] += [t for t in near if self.visible(t)] if k else list(near)
             if far:
                 links.append(Link([cable_info(c) for c in link_objs if self.visible(c)]
                                   or [CableInfo(title="Cable (restricted)")] if link_objs else []))
-                nxt = self._new_block(far, notes)
+                nxt = self._new_block(far, [])
                 blocks.append(nxt)
                 io[id(nxt)] = {"in": list(far), "out": []}
                 cur = nxt
             elif not link_objs and k == len(steps) - 1:
-                notes.append(f"The path ends at {cur.title}: nothing is connected beyond it.")
+                notes.append(("end", f"The path ends at {cur.title}: nothing is connected beyond it."))
 
         for b in blocks:
             ins, outs = io[id(b)]["in"], io[id(b)]["out"]
@@ -318,18 +322,51 @@ class Collector:
             b.ports = rows
 
         if path.is_split:
-            notes.append("The path is split: it diverges across several cables, and only one branch is shown. "
-                         "Choose another path to see the others.")
-        elif not path.is_complete and not any("ends at" in n for n in notes):
-            notes.append("The path is incomplete: it does not reach a far end.")
+            notes.append(("general", "The path is split: it diverges across several cables, and only one branch is shown. "
+                                     "Choose another path to see the others."))
+        elif not path.is_complete and not notes:
+            notes.append(("end", "The path is incomplete: it does not reach a far end."))
         if path.is_complete and not path.is_active:
-            notes.append("Not every cable on this path has the status Connected.")
+            notes.append(("general", "Not every cable on this path has the status Connected."))
+        if reverse:
+            blocks, links = reverse_chain(blocks, links)
+        return {"blocks": blocks, "links": links, "notes": notes, "path": path}
+
+    def trace_doc(self, path, origin_label=""):
+        return self.chain_doc([self.part(path)], origin_label)
+
+    def chain_doc(self, parts, origin_label=""):
+        """Join parts end to end into one TraceDoc: the equipment where two parts meet becomes one block."""
+        blocks, links = list(parts[0]["blocks"]), list(parts[0]["links"])
+        for p in parts[1:]:
+            joint, first = blocks[-1], p["blocks"][0]
+            if not joint.ports:
+                joint.ports = first.ports
+            else:
+                for i, row in enumerate(first.ports):
+                    if i < len(joint.ports):
+                        joint.ports[i].out_name, joint.ports[i].out_fields = row.out_name, row.out_fields
+                    else:
+                        joint.ports.append(row)
+            blocks += p["blocks"][1:]
+            links += p["links"]
+
+        # a note about where a path stops only means something at the ends of the whole chain
+        notes = []
+        for i, p in enumerate(parts):
+            for where, text in p["notes"]:
+                if (where == "general" or i in (0, len(parts) - 1)) and text not in notes:
+                    notes.append(text)
+        if len(parts) > 1:
+            notes.insert(0, f"This printout joins {len(parts)} traces at the equipment where they meet.")
 
         cables = [c for lk in links for c in lk.cables if c.title != "Cable (restricted)"]
-        total, definitive = path.get_total_length()
-        length = ""
-        if total:
-            length = f" · total length {_length(total, 'm')}{'' if definitive else '+'}"
+        total, definitive = 0, True
+        for p in parts:
+            t, d = p["path"].get_total_length()
+            total += t or 0
+            definitive = definitive and d
+        length = f" · total length {_length(total, 'm')}{'' if definitive else '+'}" if total else ""
         circuits = [b.title for b in blocks if b.kind == "circuit"]
         first, last = (cables[0].title, cables[-1].title) if cables else ("", "")
         label = first if first == last else f"{first} … {last}"
@@ -344,7 +381,7 @@ class Collector:
         items = []
         if blocks:
             items.append(("doc.route", f"From {end(blocks[0], 'out')}   to   {end(blocks[-1], 'in')}"))
-        state = "complete" if path.is_complete else "incomplete"
+        state = "complete" if all(p["path"].is_complete for p in parts) else "incomplete"
         items.append(("doc.summary", f"{len(cables)} cable{'s' if len(cables) != 1 else ''}{length} · path {state}"))
         summary = [text for _key, text in items]
 
@@ -353,3 +390,12 @@ class Collector:
                   f"{settings.RELEASE.full_version} · netbox-trace-print {__version__}")
         return TraceDoc(title=title, summary=summary, blocks=blocks, links=links, notes=notes, footer=footer,
                         summary_items=items, footer_items=[("doc.generated", footer)])
+
+
+def reverse_chain(blocks, links):
+    """The same chain read from the other end: blocks and links in reverse order, in and out ports swapped."""
+    for b in blocks:
+        for row in b.ports:
+            row.in_name, row.out_name = row.out_name, row.in_name
+            row.in_fields, row.out_fields = row.out_fields, row.in_fields
+    return list(reversed(blocks)), list(reversed(links))

@@ -14,6 +14,7 @@ from utilities.views import ViewTab  # noqa: F401  (kept for tabs added later)
 
 from . import __version__
 from .collect import KINDS, Collector, describe_path, model_for, paths_through
+from .extend import Chain
 from . import catalogue
 from .forms import PrintOptionsForm, PrintProfileForm, pick_form
 from .layout import LayoutSpec, render as render_pdf
@@ -114,14 +115,16 @@ def _prepare(request, kind, pk):
     path = next((p for p in paths if str(p.pk) == data.get("path")), paths[0] if paths else None)
     profile = next((p for p in profiles if str(p.pk) == data.get("profile")), None)
     keys, layout_name = _choose_keys(request, profile)
-    result = None
+    result = chain = None
     if path:
-        doc = Collector(request.user).trace_doc(path, origin_label=str(obj))
+        chain = Chain(request.user, path, before=request.GET.getlist("before"), after=request.GET.getlist("after"))
+        collector = Collector(request.user)
+        doc = collector.chain_doc(chain.parts(collector), origin_label=str(obj))
         doc = apply_selection(doc, keys, layout_name=layout_name, prepared_for=data.get("prepared_for", ""))
         pdf, report = render_pdf(doc, LayoutSpec(paper=data["paper"], orientation=data["orientation"]))
         result = {"doc": doc, "pdf": pdf, "report": report}
     return {"obj": obj, "form": form, "data": data, "path": path, "result": result, "keys": keys,
-            "profile": profile, "layout_name": layout_name}
+            "profile": profile, "layout_name": layout_name, "chain": chain}
 
 
 def _pdf_query(prep):
@@ -136,7 +139,48 @@ def _pdf_query(prep):
         pairs.append(("prepared_for", data["prepared_for"]))
     pairs.append(("custom", 1))
     pairs += [("fields", k) for k in catalogue.all_keys() if k in prep["keys"]]
+    if prep["chain"]:
+        pairs += [(side, pk) for side, ids in prep["chain"].ids.items() for pk in ids]
     return urlencode(pairs)
+
+
+def _extension(request, prep):
+    """What the 'Extend the trace' card shows: what has been added, and what can be added at each end."""
+    chain = prep["chain"]
+    if chain is None:
+        return None
+    opened = bool(request.GET.get("extend"))
+
+    def url(add=None, drop=None, extend=True):
+        q = request.GET.copy()
+        q.pop("apply", None)
+        q.setlist("before", [str(i) for i in chain.ids["before"]])
+        q.setlist("after", [str(i) for i in chain.ids["after"]])
+        if add:
+            q.appendlist(*add)
+        if drop:
+            q.setlist(drop, q.getlist(drop)[:-1])
+        if extend:
+            q["extend"] = "1"
+        else:
+            q.pop("extend", None)
+        return "?" + q.urlencode()
+
+    sides = []
+    for side, title, added in (("before", "At the start", chain.before), ("after", "At the end", chain.after)):
+        entry = {"side": side, "title": title, "added": [], "device": None, "groups": None}
+        for i, (port, path) in enumerate(added):
+            entry["added"].append({"label": describe_path(path, reverse=(side == "before")).split("  ·  ")[0],
+                                   "remove": url(drop=side) if i == len(added) - 1 else None})
+        if opened:
+            found = chain.candidates(request.user, side)
+            if found:
+                entry["device"] = found["device"]
+                entry["groups"] = [(far, [dict(item, url=url(add=(side, item["id"]))) for item in items])
+                                   for far, items in found["groups"]]
+        sides.append(entry)
+    return {"open": opened, "show_url": url(), "hide_url": url(extend=False), "sides": sides,
+            "before": chain.ids["before"], "after": chain.ids["after"], "count": len(chain.before) + len(chain.after)}
 
 
 class PrintView(KindPermissionMixin, View):
@@ -150,6 +194,7 @@ class PrintView(KindPermissionMixin, View):
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
             "pdf_url": pdf_url, "version": __version__, "groups": groups, "layout_name": prep["layout_name"],
             "selected": len(prep["keys"]), "total": len(catalogue.all_keys()), "pickers": _pickers(kind, prep["obj"]),
+            "ext": _extension(request, prep),
         })
 
 

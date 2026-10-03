@@ -61,6 +61,16 @@ the information always fits the chosen paper.
   upgrade script and by netbox-docker on start).
 - UTF-8 text throughout.
 
+## Extending a trace
+
+Under **Extend the trace** on the print page, *Show connections to add* lists the other cabled interfaces on
+the equipment at the start and at the end of the trace, grouped by where each one leads, for example
+`Ethernet49 → sto-sw-01 : Ethernet2 · 5 cables`. Click one and its path is added to the printout. The
+equipment where two traces meet is drawn once, arriving on one port and leaving on another. You can keep
+adding at either end (server – switch – ... – circuit – ... – switch – server), remove the last addition
+again, and the whole chain is one printout with one title, summary, page numbering and set of chevron markers.
+The choices live in the page address (`before=` and `after=`), so a printout can be reproduced from its link.
+
 ## Other plugins (optional)
 
 If **netbox-fms** is installed, a cable's fiber-plant record is printed on it: fiber cable type, fibers and

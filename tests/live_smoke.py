@@ -197,6 +197,63 @@ try:
 finally:
     integrations.DISABLED.clear()
 
+print("== extending a trace")
+from netbox_trace_print.extend import Chain
+
+srv = Interface.objects.get(device__name="baltic-retail-sto-srv-01", name="Gig-E 1")
+pid = lambda dev, name: Interface.objects.get(device__name=dev, name=name).pk
+chain_after = [("baltic-retail-sto-sw-01", "Ethernet49"), ("sto-sw-01", "Ethernet1"), ("sto-rtr-01", "et-0/0/0"),
+               ("mma-rtr-01", "xe-0/1/0"), ("mma-sw-01", "Ethernet2"), ("baltic-retail-mma-sw-01", "Ethernet1")]
+base_url = f"/plugins/trace-print/interface/{srv.pk}/"
+r = c.get(base_url, HTTP_HOST=HOST)
+check("the extension card is there but closed (no cost until asked)", b"Extend the trace" in r.content and b"Show connections to add" in r.content
+      and b"after=" not in r.content)
+r = c.get(base_url + "?extend=1", HTTP_HOST=HOST)
+body = r.content.decode()
+check("opened, it lists the other ports on the end equipment, grouped by where they lead",
+      "At the end: baltic-retail-sto-sw-01" in body and "sto-sw-01" in body and "after=" in body and "Ethernet49" in body, r.status_code)
+check("and the start equipment, which has the iDRAC/management port to the OOB switch", "At the start: baltic-retail-sto-srv-01" in body and "sto-oob-01" in body)
+
+base = paths_through(srv)[0]
+user = admin
+chain = Chain(user, base, after=[pid(*x) for x in chain_after])
+check("all six extensions are accepted", len(chain.after) == 6, len(chain.after))
+col = Collector(user)
+doc = col.chain_doc(chain.parts(col), origin_label="x")
+check("server to server: 17 blocks, 16 cables", len(doc.blocks) == 17 and sum(len(l.cables) for l in doc.links) == 16,
+      (len(doc.blocks), sum(len(l.cables) for l in doc.links)))
+check("it starts and ends on the two servers", doc.blocks[0].title == "baltic-retail-sto-srv-01" and doc.blocks[-1].title == "baltic-retail-mma-srv-01")
+check("the equipment where traces meet is drawn once, arriving on one port and leaving on another",
+      [(r_.in_name, r_.out_name) for r_ in doc.blocks[1].ports] == [("Ethernet1", "Ethernet49")]
+      and [(r_.in_name, r_.out_name) for r_ in doc.blocks[8].ports] == [("Termination A", "Termination Z")])
+check("the summary is for the whole chain", "From baltic-retail-sto-srv-01 : Gig-E 1   to   baltic-retail-mma-srv-01 : Gig-E 1" in doc.summary[0]
+      and "16 cables" in doc.summary[1] and "path complete" in doc.summary[1] and "Circuit NF-BRG-0001" in doc.title, doc.summary)
+check("it says it joins the traces", any("joins 7 traces" in n for n in doc.notes))
+q = "&".join("after=" + str(pid(*x)) for x in chain_after)
+r = c.get(base_url + "pdf/?" + q, HTTP_HOST=HOST)
+check("the chain prints as a pdf (several pages)", r.status_code == 200 and r.content.startswith(b"%PDF") and r.content.count(b"/Type /Page ") >= 2, r.status_code)
+page = c.get(base_url + "?extend=1&" + q, HTTP_HOST=HOST).content.decode()
+check("the page keeps the extensions in its pdf link and options form", page.count("after=") >= 6 and page.count('name="after"') == 6 and "remove" in page, page.count('name="after"'))
+check("and offers to remove the last one only", page.count(">remove<") == 1)
+
+check("a port that is not on the end equipment is ignored", len(Chain(user, base, after=[pid("sto-rtr-02", "xe-0/1/0")]).after) == 0)
+check("nonsense ids are ignored", len(Chain(user, base, after=["99999999", "abc"], before=["x"]).after) == 0)
+check("a port that is already part of the trace cannot be added again", len(Chain(user, base, after=[pid("baltic-retail-sto-sw-01", "Ethernet1")]).after) == 0)
+
+ct_base = paths_through(Interface.objects.get(device__name="sto-rtr-01", name="et-0/0/0"))[0]
+bchain = Chain(user, ct_base, before=[pid("sto-rtr-01", "xe-0/1/0"), pid("sto-sw-01", "Ethernet3")])
+check("extending at the start works too, in two steps", len(bchain.before) == 2, len(bchain.before))
+bdoc = col.chain_doc(bchain.parts(col), origin_label="x")
+check("turned around: it starts on the Baltic Retail switch and reads towards the circuit",
+      [b.title for b in bdoc.blocks][:3] == ["baltic-retail-sto-sw-01", "baltic-retail-sto-tor-01", "sto-mmr-baltic-retail-01"]
+      and [b.title for b in bdoc.blocks][-3:] == ["sto-rtr-01", "NF-BRG-0001", "mma-rtr-01"], [b.title for b in bdoc.blocks])
+check("with in and out ports the right way round",
+      [(r_.in_name, r_.out_name) for r_ in bdoc.blocks[0].ports] == [("", "Ethernet49")]
+      and [(r_.in_name, r_.out_name) for r_ in bdoc.blocks[5].ports] == [("Ethernet3", "Ethernet1")]
+      and [(r_.in_name, r_.out_name) for r_ in bdoc.blocks[6].ports] == [("xe-0/1/0", "et-0/0/0")], [[(r_.in_name, r_.out_name) for r_ in b.ports] for b in bdoc.blocks])
+both = Chain(user, ct_base, before=[pid("sto-rtr-01", "xe-0/1/0")], after=[pid("mma-rtr-01", "xe-0/1/0")])
+check("both ends at once", len(both.before) == 1 and len(both.after) == 1)
+
 print("== a user with no permissions")
 nobody = User.objects.create(username="tp-nobody")
 perm = None

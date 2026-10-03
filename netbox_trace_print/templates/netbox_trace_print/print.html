@@ -50,9 +50,54 @@
         </div>
       </div>
 
+      {% if object and ext %}
+      <div class="card mt-3">
+        <h2 class="card-header">Extend the trace</h2>
+        <div class="card-body">
+          {% if not ext.open %}
+            <p class="small text-muted mb-2">
+              Add the connections around the equipment at either end, to print them as one trace.
+              {% if ext.count %}<strong>{{ ext.count }} added.</strong>{% endif %}
+            </p>
+            <a class="btn btn-outline-primary btn-sm" href="{{ ext.show_url }}">Show connections to add</a>
+          {% else %}
+            {% for s in ext.sides %}
+              <h3 class="fs-6 mt-2">{{ s.title }}{% if s.device %}: {{ s.device }}{% endif %}</h3>
+              {% for a in s.added %}
+                <div class="small mb-1">
+                  <i class="mdi mdi-check text-success"></i> {{ a.label }}
+                  {% if a.remove %}<a href="{{ a.remove }}" class="ms-1" title="Remove">remove</a>{% endif %}
+                </div>
+              {% endfor %}
+              {% if s.groups %}
+                {% for far, items in s.groups %}
+                  <div class="small fw-bold mt-2">{{ far }}</div>
+                  <ul class="list-unstyled small mb-1 ps-2">
+                    {% for item in items %}
+                      <li><a href="{{ item.url }}">{{ item.label }}</a>{% if item.meta %} <span class="text-muted">· {{ item.meta }}</span>{% endif %}</li>
+                    {% endfor %}
+                  </ul>
+                {% endfor %}
+              {% elif s.device %}
+                <p class="small text-muted">No other cabled connections on {{ s.device }}.</p>
+              {% else %}
+                <p class="small text-muted">Nothing to extend here: this end is not on equipment with ports.</p>
+              {% endif %}
+            {% endfor %}
+            <a class="btn btn-outline-secondary btn-sm mt-2" href="{{ ext.hide_url }}">Hide</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
       {% if object %}
       <form method="get">
         <input type="hidden" name="custom" value="1">
+        {% if ext %}
+          {% if ext.open %}<input type="hidden" name="extend" value="1">{% endif %}
+          {% for v in ext.before %}<input type="hidden" name="before" value="{{ v }}">{% endfor %}
+          {% for v in ext.after %}<input type="hidden" name="after" value="{{ v }}">{% endfor %}
+        {% endif %}
 
         <div class="card mt-3">
           <h2 class="card-header">Paper</h2>

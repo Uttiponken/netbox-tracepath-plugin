@@ -35,3 +35,21 @@ for trace, get in TRACES.items():
         name = f"{slugify(profile.name)}-nordfiber-{trace}-a4-landscape.pdf"
         open(os.path.join(OUT, name), "wb").write(pdf)
         print(f"{name:70} pages={rep.pages} cols={rep.columns} fits={rep.fits} facts={len(profile.keys)}")
+
+
+# A trace extended at the end, step by step, from one Baltic Retail server to the other.
+from netbox_trace_print.extend import Chain
+
+pid = lambda dev, name: Interface.objects.get(device__name=dev, name=name).pk
+base = paths_through(Interface.objects.get(device__name="baltic-retail-sto-srv-01", name="Gig-E 1"))[0]
+chain = Chain(user, base, after=[pid(d, n) for d, n in [
+    ("baltic-retail-sto-sw-01", "Ethernet49"), ("sto-sw-01", "Ethernet1"), ("sto-rtr-01", "et-0/0/0"),
+    ("mma-rtr-01", "xe-0/1/0"), ("mma-sw-01", "Ethernet2"), ("baltic-retail-mma-sw-01", "Ethernet1")]])
+collector = Collector(user)
+doc = collector.chain_doc(chain.parts(collector), origin_label="server to server")
+for profile in PrintProfile.objects.filter(name__in=["Full information", "Field technician"]):
+    out = apply_selection(doc, profile.keys, layout_name=profile.name, prepared_for=RECIPIENT.get(profile.name, ""))
+    pdf, rep = render(out, LayoutSpec(paper="A4", orientation="landscape"))
+    name = f"{slugify(profile.name)}-nordfiber-server-to-server-extended-a4-landscape.pdf"
+    open(os.path.join(OUT, name), "wb").write(pdf)
+    print(f"{name:75} pages={rep.pages} cols={rep.columns} fits={rep.fits} blocks={len(doc.blocks)}")
