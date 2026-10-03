@@ -122,6 +122,10 @@ trunk = Cable.objects.get(label="sto-cbl-00007")           # the MeetMe trunk: f
 page = c.get(f"/plugins/trace-print/cable/{trunk.pk}/", HTTP_HOST=HOST).content.decode()
 check("a trunk with several pairs asks which pair first, and shows no preview",
       "trunk with 4 pairs in use" in page and "<object" not in page)
+check("the pair and direction choice sits under the cable dropdown in 'What to trace', not in the Paper card",
+      page.index('name="path"') < page.index('name="paper"') and page.index('name="path"') > page.index('id="pick-cable"')
+      and 'form="options-form"' in page and page.count('name="path"') == 1)
+check("it has its own button that submits the whole options form", 'type="submit" form="options-form"' in page and 'id="options-form"' in page)
 check("the choice is grouped by pair, both directions each",
       all(f'<optgroup label="Pair {n}">' in page for n in (1, 2, 3, 4)) and page.count("→") >= 8 and "Pair and direction" in page)
 r = c.get(f"/plugins/trace-print/cable/{trunk.pk}/pdf/", HTTP_HOST=HOST)

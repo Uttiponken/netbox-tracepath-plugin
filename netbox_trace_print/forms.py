@@ -52,6 +52,9 @@ class PrintOptionsForm(forms.Form):
             self.fields["path"].label = path_label
         if count < 2:
             self.fields["path"].widget = forms.HiddenInput()
+        else:
+            # shown under the object picker, outside the options form, but submitted with it
+            self.fields["path"].widget.attrs["form"] = "options-form"
         self.fields["profile"].choices = [("", "All facts (no profile)")] + list(profile_choices)
 
 

@@ -18,7 +18,7 @@
       {% elif needs_pair %}
         <div class="alert alert-info">
           <strong>This cable is a trunk with {{ pair_count }} pairs in use.</strong>
-          Choose which pair to print under <em>Paper &rarr; Pair and direction</em> on the right. A printout follows one
+          Choose which pair to print under <em>Pair and direction</em> in the menu on the right. A printout follows one
           pair at a time.
         </div>
       {% elif not path %}
@@ -49,6 +49,11 @@
         <div class="card-body">
           {% if object %}<p class="mb-2"><strong>{{ label }} {{ object }}</strong></p>{% endif %}
           {% include 'netbox_trace_print/_picker.html' %}
+          {% if object and not form.path.is_hidden %}
+            <hr>
+            {% render_field form.path %}
+            <button type="submit" form="options-form" class="btn btn-outline-primary btn-sm">Show this {% if needs_pair or pair_count %}pair{% else %}path{% endif %}</button>
+          {% endif %}
         </div>
         <div class="card-footer text-muted small">
           netbox-trace-print {{ version }} ·
@@ -97,8 +102,9 @@
       {% endif %}
 
       {% if object %}
-      <form method="get">
+      <form method="get" id="options-form">
         <input type="hidden" name="custom" value="1">
+        {% if form.path.is_hidden %}{{ form.path }}{% endif %}
         {% if ext %}
           {% if ext.open %}<input type="hidden" name="extend" value="1">{% endif %}
           {% for v in ext.before %}<input type="hidden" name="before" value="{{ v }}">{% endfor %}
@@ -110,7 +116,6 @@
           <div class="card-body">
             {% render_field form.paper %}
             {% render_field form.orientation %}
-            {% render_field form.path %}
             {% render_field form.prepared_for %}
           </div>
           <div class="card-footer text-end">
