@@ -13,7 +13,7 @@ from netbox.views import generic
 from utilities.views import ViewTab  # noqa: F401  (kept for tabs added later)
 
 from . import __version__
-from .collect import KINDS, Collector, describe_path, model_for, pair_of, paths_through
+from .collect import Collector, describe_path, kinds, model_for, pair_of, paths_through
 from .extend import Chain
 from . import catalogue
 from .forms import PrintOptionsForm, PrintProfileForm, pick_form
@@ -28,11 +28,11 @@ class KindPermissionMixin(PermissionRequiredMixin):
 
     def has_permission(self):
         user, kind = self.request.user, self.kwargs.get("kind")
-        if kind is not None and kind not in KINDS:
+        if kind is not None and kind not in kinds():
             raise Http404
         perms = ["dcim.view_cable"]
         if kind:
-            app, name, _label = KINDS[kind]
+            app, name, _label = kinds()[kind]
             perms.append(f"{app}.view_{name}")
         return user.is_authenticated and all(user.has_perm(p) for p in perms)
 
@@ -43,7 +43,7 @@ def _pickers(active=None, current=None):
     `current` is the object being printed: its selector shows it, so you can switch to another one.
     """
     out = []
-    for slug, (_a, _m, label) in KINDS.items():
+    for slug, (_a, _m, label) in kinds().items():
         initial = {"object": current.pk} if current is not None and slug == active else None
         out.append({"slug": slug, "label": label, "form": pick_form(slug)(initial=initial), "active": slug == active})
     return out
@@ -54,7 +54,7 @@ class IndexView(KindPermissionMixin, View):
         # The start page is the print page with nothing chosen yet: one layout, one place to choose.
         kind = request.GET.get("kind")
         return render(request, "netbox_trace_print/print.html", {
-            "object": None, "pickers": _pickers(kind if kind in KINDS else None), "version": __version__})
+            "object": None, "pickers": _pickers(kind if kind in kinds() else None), "version": __version__})
 
 
 class OptionsView(KindPermissionMixin, View):
@@ -116,21 +116,33 @@ def _options(request, form):
     return data
 
 
+def _starting_paths(kind, obj):
+    """The paths to offer for the chosen object: (paths, labels by path id, cable for the pair choice, WDM details)."""
+    if kind == "wdm-circuit":
+        from .integrations import wdm
+
+        found = wdm.circuit_paths(obj)
+        return [f["path"] for f in found], {f["path"].pk: f["label"] for f in found}, None, {f["path"].pk: f for f in found}
+    target = obj.cable if kind == "fiber-cable" else obj
+    return paths_through(target), {}, (target if kind in ("cable", "fiber-cable") else None), {}
+
+
 def _prepare(request, kind, pk):
     """Everything both the print page and the PDF need: object, chosen path, options, facts, the rendered PDF."""
     obj = _object(request, kind, pk)
-    paths = paths_through(obj)
+    paths, labels, cable, wdm_entries = _starting_paths(kind, obj)
+    name = lambda p: labels.get(p.pk) or describe_path(p)
     profiles = list(PrintProfile.objects.restrict(request.user, "view"))
     pairs = {}
-    if kind == "cable":                            # a trunk carries several pairs: which one is asked for first
+    if cable is not None:                          # a trunk carries several pairs: which one is asked for first
         for p in paths:
-            pairs.setdefault(pair_of(p, obj) or "", []).append(p)
+            pairs.setdefault(pair_of(p, cable) or "", []).append(p)
     if pairs and "" not in pairs:
-        choices = [(pair, [(str(p.pk), describe_path(p)) for p in group])
+        choices = [(pair, [(str(p.pk), name(p)) for p in group])
                    for pair, group in sorted(pairs.items(), key=lambda kv: (len(kv[0]), kv[0]))]
         path_label = "Pair and direction"
     else:
-        choices, path_label = [(str(p.pk), describe_path(p)) for p in paths], ""
+        choices, path_label = [(str(p.pk), name(p)) for p in paths], ""
     form = PrintOptionsForm(request.GET or None, path_choices=choices, path_count=len(paths), path_label=path_label,
                             profile_choices=[(str(p.pk), p.name) for p in profiles])
     needs_pair = len(pairs) > 1
@@ -143,9 +155,14 @@ def _prepare(request, kind, pk):
     keys, layout_name = _choose_keys(request, profile)
     result = chain = None
     if path:
-        chain = Chain(request.user, path, before=request.GET.getlist("before"), after=request.GET.getlist("after"))
         collector = Collector(request.user)
-        doc = collector.chain_doc(chain.parts(collector), origin_label=str(obj))
+        if kind == "wdm-circuit":                  # a wavelength service stops at its muxponders and is not extended
+            from .integrations import wdm
+
+            doc = wdm.trim_doc(collector.chain_doc([collector.part(path)], origin_label=str(obj)), wdm_entries[path.pk], obj)
+        else:
+            chain = Chain(request.user, path, before=request.GET.getlist("before"), after=request.GET.getlist("after"))
+            doc = collector.chain_doc(chain.parts(collector), origin_label=str(obj))
         doc = apply_selection(doc, keys, layout_name=layout_name, prepared_for=data.get("prepared_for", ""))
         pdf, report = render_pdf(doc, LayoutSpec(paper=data["paper"], orientation=data["orientation"]))
         result = {"doc": doc, "pdf": pdf, "report": report}
@@ -217,7 +234,7 @@ class PrintView(KindPermissionMixin, View):
         pdf_url = reverse("plugins:netbox_trace_print:pdf", kwargs={"kind": kind, "pk": pk}) + "?" + _pdf_query(prep)
         groups = [{"label": label, "items": [(k, l, k in prep["keys"]) for k, l in items]} for _g, label, items in catalogue.groups()]
         return render(request, "netbox_trace_print/print.html", {
-            "object": prep["obj"], "kind": kind, "label": KINDS[kind][2], "form": prep["form"], "path": prep["path"],
+            "object": prep["obj"], "kind": kind, "label": kinds()[kind][2], "form": prep["form"], "path": prep["path"],
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
             "pdf_url": pdf_url, "version": __version__, "groups": groups, "layout_name": prep["layout_name"],
             "needs_pair": prep["needs_pair"], "pair_count": prep["pair_count"],

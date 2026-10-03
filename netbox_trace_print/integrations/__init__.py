@@ -46,6 +46,14 @@ def _gather(function, *args):
     return facts
 
 
+def kinds():
+    """Extra starting points from the active integrations: {slug: (app label, model name, label)}."""
+    out = {}
+    for name in active():
+        out.update(getattr(MODULES[name], "KINDS", {}))
+    return out
+
+
 def cable_facts(cable):
     return _gather("cable_facts", cable)
 

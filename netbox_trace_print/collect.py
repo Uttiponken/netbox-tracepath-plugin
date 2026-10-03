@@ -22,7 +22,7 @@ from . import __version__, integrations
 from .model import Block, Cable as CableInfo, Field, Link, PortRow, TraceDoc
 
 # kind (URL segment) -> (app label, model name, label shown to people)
-KINDS = {
+CORE_KINDS = {
     "cable": ("dcim", "cable", "Cable"),
     "interface": ("dcim", "interface", "Interface"),
     "front-port": ("dcim", "frontport", "Front port"),
@@ -33,8 +33,15 @@ COLOR_NAMES = {str(k).lower(): str(v) for k, v in ColorChoices.CHOICES}
 LENGTH_UNITS = {"m": "m", "km": "km", "cm": "cm", "ft": "ft", "in": "in", "mi": "mi"}
 
 
+def kinds():
+    """The kinds of starting point: the core ones, then those added by installed integrations (netbox-wdm, ...)."""
+    out = dict(CORE_KINDS)
+    out.update(integrations.kinds())
+    return out
+
+
 def model_for(kind):
-    app, name, _label = KINDS[kind]
+    app, name, _label = kinds()[kind]
     return apps.get_model(app, name)
 
 

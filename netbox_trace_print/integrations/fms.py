@@ -5,6 +5,7 @@ from django.apps import apps
 from ..model import Field
 
 APP = "netbox_fms"
+KINDS = {"fiber-cable": (APP, "fibercable", "Fiber cable (FMS)")}
 
 
 def installed():

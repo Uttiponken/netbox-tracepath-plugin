@@ -14,7 +14,7 @@ See `docs/ROADMAP.md`.
 
 **Plugins → Trace Print → Print cable trace**. One page does it all: the PDF preview is on the left (empty until you
 have chosen something) and the menu is on the right. Buttons for the kinds of starting point (Cable,
-Interface, Front port, Circuit termination) sit at the top; picking one opens a dropdown
+Interface, Front port, Circuit termination, and with netbox-wdm / netbox-fms also WDM circuit and Fiber cable) sit at the top; picking one opens a dropdown
 below them on the same page. Only objects that have a cable are listed, since the others have no trace. Ports are listed
 as `equipment : port` (and found by either part) so that many `Port 1` can be told apart, and a cable shows the
 two ends it connects.
@@ -63,6 +63,15 @@ the information always fits the chosen paper.
   nothing in NetBox. Installing runs them like any plugin (`manage.py migrate`, done by NetBox's
   upgrade script and by netbox-docker on start).
 - UTF-8 text throughout.
+
+## WDM circuits and fiber cables as starting points
+
+With **netbox-wdm** installed, *WDM circuit* lists the wavelength services. A service prints from muxponder to
+muxponder, through the patch panels and trunks between them, and stops there (the client shelf beyond it and
+anything past a regenerator are left out, and the printout says so). It is titled `WDM circuit: <name>`, shows
+the channel and wavelength, and the muxponders show their channel, status and the service. A circuit with two
+directions offers both. With **netbox-fms** installed, *Fiber cable (FMS)* lists the fiber cables and behaves
+like the cable it describes, including the choice of pair for a trunk.
 
 ## Extending a trace
 

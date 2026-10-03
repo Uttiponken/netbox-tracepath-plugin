@@ -5,7 +5,7 @@ from utilities.forms.fields import DynamicModelChoiceField
 from utilities.forms.rendering import FieldSet
 from utilities.forms.widgets import APISelect
 
-from .collect import KINDS, model_for
+from .collect import kinds, model_for
 from .pdf.paper import ORIENTATIONS, PAPER_MM
 
 
@@ -18,7 +18,7 @@ def pick_form(kind):
     from .options import OPTION_KINDS, cable_label, port_label
 
     model = model_for(kind)
-    cabled = kind != "cable"
+    cabled = kind in ("interface", "front-port", "circuit-termination")
     widget, label_from = None, None
     if kind in OPTION_KINDS:
         # our own options: 'equipment : port' (and cables with their ends), searchable by either part
@@ -27,7 +27,7 @@ def pick_form(kind):
         label_from = cable_label if kind == "cable" else port_label
     field = DynamicModelChoiceField(
         queryset=model.objects.filter(cable__isnull=False) if cabled else model.objects.all(),
-        query_params={} if widget else {"cabled": "true"}, label=KINDS[kind][2], required=True, widget=widget,
+        query_params={} if widget else {"cabled": "true"}, label=kinds()[kind][2], required=True, widget=widget,
         help_text="Only objects with a cable are listed." if cabled else "")
     if label_from:
         field.label_from_instance = label_from

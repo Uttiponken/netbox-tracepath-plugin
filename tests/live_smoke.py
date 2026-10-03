@@ -78,7 +78,9 @@ cable = Cable.objects.get(label="sto-cbl-00016")
 r = c.get("/plugins/trace-print/", HTTP_HOST=HOST)
 body = r.content.decode()
 check("start page has a button for every kind, including Cable and no Rear port", all(k in body for k in ("Cable", "Interface", "Front port", "Circuit termination")) and "Rear port" not in body)
-check("one dropdown per kind, below the buttons, on the same page", body.count('data-bs-toggle="pill"') == 4 and body.count('class="tab-pane') == 4, body.count('data-bs-toggle="pill"'))
+check("one dropdown per kind, below the buttons, on the same page (core kinds plus FMS and WDM)",
+      body.count('data-bs-toggle="pill"') == 6 and body.count('class="tab-pane') == 6 and "WDM circuit" in body and "Fiber cable (FMS)" in body,
+      body.count('data-bs-toggle="pill"'))
 check("the port and cable dropdowns get their options from the plugin (equipment : port)",
       all(f'data-url="/plugins/trace-print/options/{k}/"' in body for k in ("interface", "front-port", "cable")))
 check("the circuit-termination dropdown only asks NetBox for objects that have a cable", body.count("cabled") >= 1)
@@ -299,6 +301,52 @@ check("with in and out ports the right way round",
       and [(r_.in_name, r_.out_name) for r_ in bdoc.blocks[6].ports] == [("xe-0/1/0", "et-0/0/0")], [[(r_.in_name, r_.out_name) for r_ in b.ports] for b in bdoc.blocks])
 both = Chain(user, ct_base, before=[pid("sto-rtr-01", "xe-0/1/0")], after=[pid("mma-rtr-01", "xe-0/1/0")])
 check("both ends at once", len(both.before) == 1 and len(both.after) == 1)
+
+print("== WDM circuits and FMS fiber cables as starting points")
+from netbox_fms.models import FiberCable
+from netbox_wdm.models import WdmCircuit
+from netbox_trace_print.integrations import wdm as _wdm
+
+fjord = WdmCircuit.objects.get(name__startswith="Fjord")
+seg1 = WdmCircuit.objects.get(name__startswith="Baltic Retail Group Backup - Segment 1")
+r = c.get("/plugins/trace-print/?kind=wdm-circuit", HTTP_HOST=HOST)
+check("the WDM circuit dropdown asks NetBox for its circuits", 'nav-link border active' in r.content.decode() and "/api/plugins/wdm/wdm-circuits/" in r.content.decode())
+r = c.get(f"/plugins/trace-print/wdm-circuit/?object={fjord.pk}", HTTP_HOST=HOST)
+check("choosing a WDM circuit goes to its print page", r.status_code == 302 and r["Location"].endswith(f"/wdm-circuit/{fjord.pk}/"), (r.status_code, r.get("Location")))
+page = c.get(f"/plugins/trace-print/wdm-circuit/{fjord.pk}/", HTTP_HOST=HOST).content.decode()
+check("its two directions are named by muxponder and channel", "sto-wdm-01 · C21 (" in page and "→ osl-wdm-01 · C21 (" in page and "<object" in page, page.count("→"))
+check("no extension card for a wavelength service", "Extend the trace" not in page)
+col = Collector(admin)
+for circuit, ends in ((fjord, {"sto-wdm-01", "osl-wdm-01"}), (seg1, {"sto-wdm-02", "got-wdm-01"})):
+    entry = _wdm.circuit_paths(circuit)[0]
+    d = _wdm.trim_doc(col.chain_doc([col.part(entry["path"])]), entry, circuit)
+    check(f"{circuit.name[:32]}: from muxponder to muxponder, nothing beyond",
+          {d.blocks[0].title, d.blocks[-1].title} == ends and len(d.blocks) == 4 and sum(len(l.cables) for l in d.links) == 3
+          and not [b for b in d.blocks if "dcp2" in b.title], [b.title for b in d.blocks])
+    check("  titled and summarised as the service", d.title == f"WDM circuit: {circuit.name}" and "wavelength service" in d.summary[1]
+          and any("left out" in n for n in d.notes) and not any("joins" in n or "ends at" in n for n in d.notes), (d.title, d.summary, d.notes))
+    check("  the muxponders show their channel and service", any(f.key == "wdm.channel" for b in (d.blocks[0], d.blocks[-1]) for row in b.ports for f in row.in_fields + row.out_fields)
+          and any(f.key == "wdm.service" for b in (d.blocks[0], d.blocks[-1]) for row in b.ports for f in row.in_fields + row.out_fields))
+    check("  the long-haul trunk in the middle carries its fiber record", any(f.key == "fms.serial" for lk in d.links for cb in lk.cables for f in cb.fields))
+r = c.get(f"/plugins/trace-print/wdm-circuit/{fjord.pk}/pdf/", HTTP_HOST=HOST)
+check("a WDM circuit prints as a pdf", r.status_code == 200 and r.content.startswith(b"%PDF"), r.status_code)
+
+fc = FiberCable.objects.get(cable__label="bb-cbl-00001")
+r = c.get(f"/plugins/trace-print/fiber-cable/?object={fc.pk}", HTTP_HOST=HOST)
+check("choosing an FMS fiber cable goes to its print page", r.status_code == 302 and r["Location"].endswith(f"/fiber-cable/{fc.pk}/"), (r.status_code, r.get("Location")))
+page = c.get(f"/plugins/trace-print/fiber-cable/{fc.pk}/", HTTP_HOST=HOST).content.decode()
+check("a fiber cable behaves like its cable (one pair in use, no choice needed)", "<object" in page and "Fiber cable (FMS)" in page and "pairs in use" not in page)
+fc_mm = FiberCable.objects.filter(cable__label="bb-cbl-00005").first()
+check("the long-haul fiber cables print", c.get(f"/plugins/trace-print/fiber-cable/{fc_mm.pk}/pdf/", HTTP_HOST=HOST).status_code == 200)
+
+integrations.DISABLED.update({"wdm"})
+try:
+    check("without netbox-wdm there is no WDM circuit button and the address is unknown",
+          "WDM circuit" not in c.get("/plugins/trace-print/", HTTP_HOST=HOST).content.decode()
+          and c.get(f"/plugins/trace-print/wdm-circuit/{fjord.pk}/", HTTP_HOST=HOST).status_code == 404)
+finally:
+    integrations.DISABLED.clear()
+check("with it, the kinds are back", "wdm-circuit" in __import__("netbox_trace_print.collect", fromlist=["x"]).kinds())
 
 print("== a user with no permissions")
 nobody = User.objects.create(username="tp-nobody")
