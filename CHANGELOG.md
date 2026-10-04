@@ -2,6 +2,11 @@
 
 Releases are tagged `vX.Y.Z`; sample PDFs for each are in `samples/X.Y.Z/`.
 
+## 0.6.1
+
+- An **Authors** section in the README: co-authored by JP and Claude (Claude Sonnet 5.5), and the package author
+  metadata says the same. No change to the plugin's behaviour or printouts.
+
 ## 0.6.0
 
 **Scoped prints**

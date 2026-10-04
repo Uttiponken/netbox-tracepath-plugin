@@ -10,7 +10,7 @@ continues E–F–G on the next.
 *Example: a colocation tenant's path from its switch to Nordfiber's core switch, A4 landscape, printed with the
 Field technician profile (`samples/0.5.0/field-technician-nordfiber-colo-tenant-a4-landscape.pdf`).*
 
-**Status: early development (0.6.0).** Start from a cable, interface, front port or circuit termination
+**Status: early development (0.6.1).** Start from a cable, interface, front port or circuit termination
 (and, with netbox-wdm / netbox-fms, a WDM circuit, fiber cable or fiber circuit), choose which facts to print
 (by recipient, using print profiles), extend the trace at either end, see it as a PDF in the page and download
 it, optionally limited to one site, location or rack. Colours by site/rack are next. See `docs/ROADMAP.md` and
