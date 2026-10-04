@@ -264,6 +264,11 @@ body = r.content.decode()
 check("opened, it lists the other ports on the end equipment, grouped by where they lead",
       "At the end: baltic-retail-sto-sw-01" in body and "sto-sw-01" in body and "after=" in body and "Ethernet49" in body, r.status_code)
 check("and the start equipment, which has the iDRAC/management port to the OOB switch", "At the start: baltic-retail-sto-srv-01" in body and "sto-oob-01" in body)
+card = body[body.index("Extend the trace"):body.index('id="options-form"')]
+heads = [m_ for m_ in __import__("re").findall(r'<h3 class="([^"]*)">(At the (?:start|end)[^<]*)</h3>', card)]
+check("the At the start / At the end headings are larger than the equipment headings below them, with a line between the two sections",
+      len(heads) == 2 and all("fs-5" in cls and "fw-bold" in cls for cls, _t in heads) and 'class="small fw-bold mt-2"' in card
+      and card.count('<hr class="my-3">') == 1 and card.index(heads[0][1]) < card.index('<hr class="my-3">') < card.index(heads[1][1]), heads)
 
 base = paths_through(srv)[0]
 user = admin

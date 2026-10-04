@@ -73,7 +73,8 @@
             <a class="btn btn-outline-primary btn-sm" href="{{ ext.show_url }}">Show connections to add</a>
           {% else %}
             {% for s in ext.sides %}
-              <h3 class="fs-6 mt-2">{{ s.title }}{% if s.device %}: {{ s.device }}{% endif %}</h3>
+              {% if not forloop.first %}<hr class="my-3">{% endif %}
+              <h3 class="fs-5 fw-bold mt-1 mb-2">{{ s.title }}{% if s.device %}: {{ s.device }}{% endif %}</h3>
               {% for a in s.added %}
                 <div class="small mb-1">
                   <i class="mdi mdi-check text-success"></i> {{ a.label }}

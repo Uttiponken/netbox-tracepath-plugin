@@ -2,11 +2,11 @@
 
 ## Steps
 
-1. **Printable trace.** Done: PDF output (standard library only, UTF-8), the "full information"
-   layout, real traces from NetBox, picker and print pages, chevron markers where a trace continues on
-   another page, and choosing which facts to print by recipient (print profiles, stored in the
-   plugin's own tables). To do: choose which fields
-   to print depending on who gets the printout (presets), as a selection at print time.
+1. **Printable trace. Done (0.1.0 to 0.5.0).** PDF output (standard library only, UTF-8), the "full
+   information" layout, real traces from NetBox, one page to start and print, chevron markers where a trace
+   continues on another page, choosing which facts to print by recipient (print profiles in the plugin's own
+   tables), extending a trace at either end, and WDM circuits, fiber cables and fiber circuits as starting
+   points. See `CHANGELOG.md`.
 2. **Colour by site / location / rack**, so connection points are easy to find, and still fully
    readable in black and white (tint + pattern + text tag, never colour alone).
 3. **Further improvements**, among them scoped prints, bulk prints, cable end labels with QR codes,
@@ -31,6 +31,12 @@
   the first cell of a continuing page ("Continued from page N") and the last cell of a page that
   continues ("Continues on page N"). It names the equipment and port on the other side and its
   site and rack. The cable that crosses the break is drawn, and named, on both pages.
+- A trunk cable carries several pairs, so a printout always follows one pair and direction: the page asks
+  for the pair first. Services (WDM and fiber circuits) print from their first to their last equipment and
+  are not extended.
+- Cable colours are NetBox's own (the cable's Colour field); the plugin does not invent colours.
+- Other plugins (netbox-fms, netbox-wdm) are optional: their facts and starting points exist only when they
+  are installed, and an integration that fails is skipped and logged.
 - Block = a parent object (device, circuit, provider network, site) with the ports the path uses on
   it, as in NetBox's own trace drawing.
 

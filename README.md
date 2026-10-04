@@ -5,10 +5,10 @@ and field engineers. Each device on the path is a block, laid out in a grid that
 wraps like text across the page, so a long trace reads A–B–C–D on one row and
 continues E–F–G on the next.
 
-**Status: early development (0.3.0).** You can pick an interface, front or rear port or circuit
-termination, choose which facts to print (by recipient, using print profiles), see the cable trace as
-a PDF in the page, and download it. Colours by site/rack and scoping a print to one site are next.
-See `docs/ROADMAP.md`.
+**Status: early development (0.5.1).** Start from a cable, interface, front port or circuit termination
+(and, with netbox-wdm / netbox-fms, a WDM circuit, fiber cable or fiber circuit), choose which facts to print
+(by recipient, using print profiles), extend the trace at either end, see it as a PDF in the page and download
+it. Colours by site/rack and scoping a print to one site are next. See `docs/ROADMAP.md` and `CHANGELOG.md`.
 
 ## Use
 
@@ -55,9 +55,9 @@ the information always fits the chosen paper.
 
 - **No dependencies.** Installs on a vanilla NetBox with no extra packages. The PDF
   writer and layout engine use only the Python standard library; the font is bundled.
-- **Generic fields only.** Standard NetBox data (cables, ports, devices, racks,
-  locations, sites, tenants, circuits). No custom fields and no data from other
-  plugins.
+- **Generic fields only in the core.** Standard NetBox data (cables, ports, devices, racks,
+  locations, sites, tenants, circuits). No custom fields. Facts from other plugins (netbox-fms,
+  netbox-wdm) are optional extras, printed only when that plugin is installed (see *Other plugins*).
 - **Own tables only.** Print profiles live in two tables of the plugin (`netbox_trace_print_printprofile`
   and `..._printprofilefield`). They hold no reference to any NetBox object and the migrations depend on
   nothing in NetBox. Installing runs them like any plugin (`manage.py migrate`, done by NetBox's
@@ -102,6 +102,14 @@ print profiles like any other. Neither plugin is needed: without them the facts 
 simply absent, and a profile that lists them keeps working. If the other plugin changes in a way this
 plugin does not understand, that part is skipped and logged instead of failing the printout.
 
+## Cable colours
+
+The plugin does not choose cable colours. A cable is drawn in the colour NetBox stores on it (the *Colour*
+field of the cable), with the colour's name, a swatch and a coloured line; unticking the *Colour* fact hides
+all three. The sample dataset sets them by rule: grey copper, yellow fiber, black DAC cables, and green
+24-pair trunks inside a site and blue ones between sites. Colouring blocks by site, location or rack is a
+planned step (`docs/ROADMAP.md`).
+
 ## Known limits
 
 - Interfaces bridged to another interface are not followed past the bridge.
@@ -117,8 +125,10 @@ plugin does not understand, that part is skipped and logged instead of failing t
 python -m tests.demo_layout         # regenerate samples/<version>/ (run it in the container)
 ```
 
-`tests/live_smoke.py` and `tests/live_render.py` run against a live NetBox with data; see their
-docstrings.
+The live tests (`tests/live_smoke.py`, `live_render.py`, `live_profiles.py`, `live_wdm.py`, `live_fms.py`) run
+inside a NetBox container against the Nordfiber sample data. `docs/TESTING.md` explains the local setup and how
+to build that data; `docs/ARCHITECTURE.md` explains how the plugin is put together and how to add a fact, a
+starting point or support for another plugin. Releases are listed in `CHANGELOG.md`.
 
 ## Compatibility
 
