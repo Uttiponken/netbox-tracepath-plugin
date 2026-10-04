@@ -222,7 +222,8 @@ def _device_block(dev):
             _f("Tags", _tags(dev), "device.tags"),
             _f("Comments", dev.comments, "device.comments"),
         ) + integrations.device_facts(dev),
-        site=dev.site.name, location=dev.location.name if dev.location else "", rack=dev.rack.name if dev.rack else "")
+        site=dev.site.name, location=dev.location.name if dev.location else "", rack=dev.rack.name if dev.rack else "",
+        color_hex=(dev.role.color or "").lower().lstrip("#"))
 
 
 def _circuit_block(circuit):

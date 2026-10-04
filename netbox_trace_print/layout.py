@@ -59,6 +59,26 @@ class LayoutReport:
     page_segments: list = field(default_factory=list)  # for every page, the (number, of) of the segment it belongs to
 
 
+def _luminance(rgb):
+    """WCAG relative luminance of an (r, g, b) tuple of 0..1."""
+    lin = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in rgb]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+WHITE_BELOW = 0.30         # in colour: text on a header is white when the background's relative luminance is below this
+WHITE_BELOW_BW = 0.18      # in black and white: the "best contrast" limit, white only where it has 4.5:1 or more
+
+
+def ink_for(rgb, white_below=WHITE_BELOW):
+    """White text on a dark or medium-dark background, black on a lighter one.
+
+    In colour the limit is 0.30: the strictly "best contrast" limit would be 0.18, but white on mid-tones such as
+    slate blue, blue or red looks better than black (white is never below 3:1, black never below 7:1). In a black
+    and white printout the background is a grey, and white on mid-grey prints thin on a laser printer or a
+    photocopy, so the stricter 0.18 is used there: every header then has at least 4.5:1."""
+    return 1 if _luminance(rgb) < white_below else 0
+
+
 class Metrics:
     """Text measuring and wrapping for one font size."""
 
@@ -531,6 +551,21 @@ class Engine:
         r, g, b = (int(hex_value[i:i + 2], 16) for i in (0, 2, 4))
         return (0.299 * r + 0.587 * g + 0.114 * b) / 255
 
+    def _header_style(self, hex_value):
+        """(background, text colour for the title, text colour for the subtitle) of a block header. Without a
+        colour it is the usual light grey; with one, the colour (or its grey in a black and white printout) and
+        black or white text that reads on it."""
+        if not hex_value:
+            return HEADER_FILL, 0, SOFT
+        rgb = tuple(int(hex_value[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        if self.spec.color:
+            fill = hex_value
+        else:
+            fill = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+            rgb = (fill, fill, fill)
+        ink = ink_for(rgb, WHITE_BELOW if self.spec.color else WHITE_BELOW_BW)
+        return fill, ink, ink
+
     def _cable_line(self, c, link, points):
         for k, cable in enumerate(link.cables):
             off = k * 4.0
@@ -566,13 +601,14 @@ class Engine:
         c = pt.c
         pt.report.block_boxes.append((pt.page_no, bx, y, bx + bw, y + h))
         c.rect(bx, y, bw, h, fill=1, stroke=0, width=0.9)
-        c.rect(bx, y, bw, info["hdr"], fill=HEADER_FILL, stroke=0, width=0.9)
+        fill, title_ink, sub_ink = self._header_style(block.color_hex)
+        c.rect(bx, y, bw, info["hdr"], fill=fill, stroke=0, width=0.9)
         ty = y + PAD
         for line in bp.title:
-            pt.text(bx + PAD, ty, line, True, bp.tsize, lh=bp.tlh)
+            pt.text(bx + PAD, ty, line, True, bp.tsize, fill=title_ink, lh=bp.tlh)
             ty += bp.tlh
         for line in bp.sub:
-            pt.text(bx + PAD, ty, line, fill=SOFT)
+            pt.text(bx + PAD, ty, line, fill=sub_ink)
             ty += m.lh
 
         py = y + info["hdr"]

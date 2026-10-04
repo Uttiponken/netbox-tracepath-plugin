@@ -2,6 +2,13 @@
 
 Releases are tagged `vX.Y.Z`; sample PDFs for each are in `samples/X.Y.Z/`.
 
+## 0.6.2
+
+- **Equipment colour.** The header of each block is filled with the colour NetBox gives the equipment (its device
+  role), with white text on dark and medium-dark colours (relative luminance below 0.30) and black text on lighter ones.
+  In *A4 (B/W)* the colour becomes the grey of the same
+  lightness and white text is used only on the darker greys (at least 4.5:1 contrast). Circuits, sites and provider networks keep the light grey header.
+
 ## 0.6.1
 
 - An **Authors** section in the README: co-authored by JP and Claude (Claude Sonnet 5.5), and the package author

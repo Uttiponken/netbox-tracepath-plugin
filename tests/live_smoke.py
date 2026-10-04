@@ -620,6 +620,17 @@ finally:
 from netbox.registry import registry as _registry
 check("the column is registered on all six tables", all("print_trace" in _registry["tables"][row[1]] for row in lists), [row[1].__name__ for row in lists])
 
+print("== the equipment's colour as the header background")
+role_doc = Collector(admin).trace_doc(paths_through(iface)[0])
+devices_on_path = {d.name: d for d in Device.objects.filter(name__in=[b.title for b in role_doc.blocks]).select_related("role")}
+check("every block of equipment carries the colour NetBox gives its role",
+      role_doc.blocks and all(b.color_hex == devices_on_path[b.title].role.color.lower() and len(b.color_hex) == 6 for b in role_doc.blocks if b.kind == "device"),
+      [(b.title, b.color_hex) for b in role_doc.blocks])
+check("and blocks that are not equipment (circuits, sites) have none", all(not b.color_hex for b in Collector(admin).trace_doc(paths_through(ct)[0]).blocks if b.kind != "device"))
+colour_pdf = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=A4", HTTP_HOST=HOST).content
+bw_pdf = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=A4:bw", HTTP_HOST=HOST).content
+check("the print is in colour on A4 (Color) and grey only on A4 (B/W)", _chromatic(colour_pdf) and not _chromatic(bw_pdf))
+
 print("== a user with no permissions")
 nobody = User.objects.create(username="tp-nobody")
 perm = None

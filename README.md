@@ -10,7 +10,7 @@ continues E–F–G on the next.
 *Example: a colocation tenant's path from its switch to Nordfiber's core switch, A4 landscape, printed with the
 Field technician profile (`samples/0.5.0/field-technician-nordfiber-colo-tenant-a4-landscape.pdf`).*
 
-**Status: early development (0.6.1).** Start from a cable, interface, front port or circuit termination
+**Status: early development (0.6.2).** Start from a cable, interface, front port or circuit termination
 (and, with netbox-wdm / netbox-fms, a WDM circuit, fiber cable or fiber circuit), choose which facts to print
 (by recipient, using print profiles), extend the trace at either end, see it as a PDF in the page and download
 it, optionally limited to one site, location or rack. Colours by site/rack are next. See `docs/ROADMAP.md` and
@@ -140,9 +140,17 @@ print profiles like any other. Neither plugin is needed: without them the facts 
 simply absent, and a profile that lists them keeps working. If the other plugin changes in a way this
 plugin does not understand, that part is skipped and logged instead of failing the printout.
 
-## Cable colours
+## Colours
 
-The plugin does not choose cable colours. A cable is drawn in the colour NetBox stores on it (the *Colour*
+**Equipment.** The header of each block (the equipment's name and its role and model) is filled with the colour
+NetBox gives the equipment, that is the colour of its device role, so patch panels, switches and routers are told
+apart at a glance. The text on it is white on dark and medium-dark colours (relative luminance below 0.30: for example slate
+blue, blue, red, teal and darker) and black on lighter ones. In a black and white printout
+(*A4 (B/W)*) the colour becomes the grey of the same lightness and the text is white only on the darker greys
+(at least 4.5:1 contrast, so it stays readable on a laser printer or a photocopy); the role's name is still
+printed in the header. Blocks that are not equipment (circuits, sites, provider networks) keep the light grey header.
+
+**Cables.** The plugin does not choose cable colours. A cable is drawn in the colour NetBox stores on it (the *Colour*
 field of the cable): a coloured line and a swatch by its name. **Colour or black and white is the paper
 choice**: *A4 (Color)* prints the cable colours, *A4 (B/W)* prints them as grey tones of the same lightness (still
 told apart by shade and by the cable's name), on any paper size. The *Colour* fact only decides whether the

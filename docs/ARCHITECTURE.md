@@ -66,7 +66,8 @@ real font, wraps it inside its block (nothing is cut off), lays the blocks on a 
 text, and takes as many rows as fit on each page. If a row does not fit it first uses fewer, wider columns and
 only then a smaller font (7 pt at the smallest); anything that still cannot fit is reported in
 `LayoutReport.warnings`. Where a trace continues on another page, chevron markers are cells of the grid.
-`LayoutSpec.color` is the colour or black and white choice: with `color=False` every cable colour is drawn as the
+A block's header is filled with `Block.color_hex` (the device role's colour, set by `collect.py`), with white text on
+dark and medium-dark backgrounds and black on lighter ones (`ink_for`, limit `WHITE_BELOW` = 0.30; `WHITE_BELOW_BW` = 0.18 on the grey of a black and white printout). `LayoutSpec.color` is the colour or black and white choice: with `color=False` every cable colour is drawn as the
 grey of the same lightness (`Engine._tone`); the paper choice `A4:bw` means A4 with `color=False`.
 `pdf/` is a standard-library PDF writer: a TrueType subsetter (`ttf.py`), the bundled DejaVu fonts, paper sizes
 and a small canvas. There are no runtime dependencies.

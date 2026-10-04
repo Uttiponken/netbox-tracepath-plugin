@@ -48,6 +48,8 @@ class Block:
     site: str = ""
     location: str = ""
     rack: str = ""
+    # The colour NetBox gives the equipment (its device role), 'rrggbb'. Drawn as the background of the header.
+    color_hex: str = ""
 
 
 @dataclass
