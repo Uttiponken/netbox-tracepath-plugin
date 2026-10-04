@@ -187,6 +187,16 @@ Add to `PLUGINS` in NetBox's `configuration.py` (no `PLUGINS_CONFIG` needed):
 PLUGINS = ["netbox_trace_print"]
 ```
 
+## Authors
+
+Co-authored by JP and Claude (Anthropic's AI assistant, model **Claude Sonnet 5.5**, `claude-sonnet-5-5`, used
+through Claude Code): the code, the tests, the documentation and the sample printouts were developed together
+in pair-programming sessions. Every commit made with Claude's help carries a `Co-Authored-By: Claude Sonnet 5.5`
+line, so the model behind any change can be read from the history and compared with later ones.
+
+The sample printouts come from the [netbox-sampledata](https://github.com/Uttiponken/netbox-sampledata)
+dataset: fictional companies on real hardware (see "Authors" in its README).
+
 ## License
 
 Apache-2.0, the same as NetBox.

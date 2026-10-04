@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.12.0"
-authors = [{ name = "Jean-Pierre" }]
+authors = [{ name = "JP" }, { name = "Claude Sonnet 5.5 (Anthropic)" }]
 keywords = ["netbox", "netbox-plugin", "cable", "trace", "pdf", "print"]
 classifiers = [
     "Framework :: Django",
