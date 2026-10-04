@@ -16,6 +16,7 @@ Pure Python, no Django.
 
 from dataclasses import dataclass, field
 
+from .model import Segment
 from .pdf.fonts import load_font
 from .pdf.paper import MM, page_size
 from .pdf.writer import Document
@@ -41,6 +42,7 @@ class LayoutSpec:
     min_block_width: float = 140.0
     font: str = "cond"
     bold: str = "cond-bold"
+    color: bool = True              # False: cable colours become grey tones (a black and white printout)
 
 
 @dataclass
@@ -52,7 +54,9 @@ class LayoutReport:
     warnings: list = field(default_factory=list)
     boxes: list = field(default_factory=list)         # (page, x0, y0, x1, y1) of every text run, for tests
     block_boxes: list = field(default_factory=list)   # the same for every block frame
-    chevron_boxes: list = field(default_factory=list)  # (page, kind, x0, y0, x1, y1, text) of every chevron marker
+    chevron_boxes: list = field(default_factory=list)  # (page, kind, x0, y0, x1, y1, text) of every chevron marker;
+                                                       # kind is in / out (page breaks) or edge-in / edge-out (scope)
+    page_segments: list = field(default_factory=list)  # for every page, the (number, of) of the segment it belongs to
 
 
 class Metrics:
@@ -189,22 +193,29 @@ class Engine:
 
         # Pages are built one at a time: take as many blocks as fit. A page that continues an earlier one
         # starts with a chevron marker (a cell like any other), and one that continues on a later page
-        # ends with one. The cable that crosses the break is drawn on both sides of it.
-        pages, i, fits, total = [], 0, True, len(doc.blocks)
-        while i < total or not pages:
-            p = len(pages)
-            top = top_first if p == 0 else top_next
-            chosen = None
-            for count in range(max(total - i, 1), 0, -1):
-                layout = self._layout_page(m, self._cells(m, i, count, p, bw), n, plans, gw, avail, top, bottom)
-                if layout["fits"]:
-                    chosen = (count, layout)
-                    break
-            if chosen is None:
-                fits = False
-                chosen = (1, layout)
-            pages.append(chosen[1])
-            i += chosen[0]
+        # ends with one. The cable that crosses the break is drawn on both sides of it. A scoped print has
+        # several segments, and each starts on a new page.
+        pages, fits, total = [], True, len(doc.blocks)
+        segments = doc.segments or [Segment(0, total - 1)]
+        for s, seg in enumerate(segments):
+            i, continued = seg.first, False
+            while i <= seg.last:
+                p = len(pages)
+                top = top_first if p == 0 else top_next
+                chosen = None
+                for count in range(seg.last - i + 1, 0, -1):
+                    cells = self._cells(m, i, count, p, bw, seg, continued)
+                    layout = self._layout_page(m, cells, n, plans, gw, avail, top, bottom)
+                    if layout["fits"]:
+                        chosen = (count, layout)
+                        break
+                if chosen is None:
+                    fits = False
+                    chosen = (1, layout)
+                chosen[1]["segment"] = (s + 1, len(segments))
+                pages.append(chosen[1])
+                i += chosen[0]
+                continued = True
         return {"m": m, "n": n, "bw": bw, "gw": gw, "avail": avail, "plans": plans, "pages_layout": pages,
                 "fits": fits, "label_w": label_w, "pages": len(pages), "foot": foot}
 
@@ -228,11 +239,31 @@ class Engine:
         return {"kind": kind, "idx": neighbour, "lines": lines, "out": neighbour if kind == "in" else None,
                 "h": max(CHEV_MIN_H, len(lines) * m.lh + 2 * PAD)}
 
-    def _cells(self, m, first, count, page, bw):
-        total = len(self.doc.blocks)
-        cells = [self._chevron(m, "in", first - 1, page, bw)] if page > 0 else []
-        cells += [{"kind": "block", "idx": j, "out": j if j < total - 1 else None} for j in range(first, first + count)]
-        if first + count < total:
+    def _edge(self, m, idx, bw):
+        """A scope's edge marker: a chevron for the equipment just outside the scope (it is a block of kind
+        edge-in / edge-out, built by scope.py)."""
+        blk = self.doc.blocks[idx]
+        entering = blk.kind == "edge-in"
+        row = blk.ports[0] if blk.ports else None
+        port = (row.out_name if entering else row.in_name) if row else ""
+        text_w = bw - 2 * TIP - 2 * PAD
+        lines = [(t, True, 0) for t in m.wrap(blk.subtitle, text_w, True)]
+        where = f"{blk.title} : {port}" if port else blk.title
+        lines += [(t, True, 0) for t in m.wrap(f"{'from' if entering else 'to'} {where}", text_w, True)]
+        place = " · ".join(x for x in (blk.site, blk.rack) if x)
+        if place:
+            lines += [(t, False, SOFT) for t in m.wrap(place, text_w)]
+        return {"kind": "in" if entering else "out", "edge": True, "idx": idx, "lines": lines,
+                "out": idx if entering else None, "h": max(CHEV_MIN_H, len(lines) * m.lh + 2 * PAD)}
+
+    def _cells(self, m, first, count, page, bw, seg, continued):
+        cells = [self._chevron(m, "in", first - 1, page, bw)] if continued else []
+        for j in range(first, first + count):
+            if self.doc.blocks[j].kind in ("edge-in", "edge-out"):
+                cells.append(self._edge(m, j, bw))
+            else:
+                cells.append({"kind": "block", "idx": j, "out": j if j < seg.last else None})
+        if first + count <= seg.last:
             cells.append(self._chevron(m, "out", first + count, page, bw))
         return cells
 
@@ -352,11 +383,27 @@ class Engine:
             "running": m.wrap(doc.title, content_w, True, 9),
         }
 
+    def _tag(self, number, of, first_page):
+        """The line that says which scope and segment a page shows. The first page already states the scope in
+        its summary, so it only names the segment; every other page repeats the scope."""
+        doc = self.doc
+        if first_page:
+            return f"Segment 1 of {of}" if of > 1 else ""
+        if not doc.scope:
+            return ""
+        return f"{doc.scope} · Segment {number} of {of}" if of > 1 else doc.scope
+
     def _header_heights(self, m, content_w):
         t = self._header_text(m, content_w)
+        of = len(self.doc.segments) or 1
         first = len(t["title"]) * 18.0 + 2 + 3 + len(t["summary"]) * m.lh + 3
         first += sum(len(n) * m.lh + 4 + 4 for n in t["notes"]) + 6
+        if self._tag(1, of, True):
+            first += len(m.wrap(self._tag(1, of, True), content_w, True)) * m.lh + 3
         nxt = len(t["running"]) * 12.0 + 6
+        longest = self._tag(of, of, False)
+        if longest:
+            nxt += len(m.wrap(longest, content_w, True)) * m.lh
         return first, nxt, 16.0
 
     # -- drawing --------------------------------------------------------------
@@ -368,6 +415,7 @@ class Engine:
             report.warnings.append(
                 f"A row of blocks is taller than a {self.spec.paper} {self.spec.orientation} page at "
                 f"{self.spec.min_size:g} pt. Choose larger paper or fewer fields.")
+        report.page_segments = [page["segment"] for page in plan["pages_layout"]]
         pdf = Document(title=doc.title, author="netbox-trace-print")
         for p, page in enumerate(plan["pages_layout"]):
             pt = _Painter(pdf.add_page(self.page_w, self.page_h), p, m, report)
@@ -398,10 +446,19 @@ class Engine:
                 for i, t in enumerate(lines):
                     pt.text(x0 + 8, y + 2 + i * m.lh, t)
                 y += h + 4
+            number, of = plan["pages_layout"][p]["segment"]
+            for line in m.wrap(self._tag(number, of, True), x1 - x0, True) if self._tag(number, of, True) else []:
+                pt.text(x0, y, line, True)
+                y += m.lh
         else:
             for k, line in enumerate(head["running"]):
                 pt.text(x0, self.margin + k * 12, line, True, 9, lh=12)
             ry = self.margin + len(head["running"]) * 12 + 1
+            number, of = plan["pages_layout"][p]["segment"]
+            tag = self._tag(number, of, False)
+            for line in m.wrap(tag, x1 - x0, True) if tag else []:
+                pt.text(x0, ry, line, True)
+                ry += m.lh
             c.line(x0, ry, x1, ry, stroke=0, width=0.6)
         fy = self.page_h - self.margin - plan["foot"] + 2
         c.line(x0, fy, x1, fy, stroke=0, width=0.4)
@@ -453,17 +510,26 @@ class Engine:
             self._details_below(pt, m, link, x0, line_y + 4, avail, True)
 
     def _draw_chevron(self, pt, m, cell, x0, bw, conn_y):
-        """A marker where the trace continues on another page: a chevron pointing in the direction of travel."""
+        """A marker where the trace continues on another page, or where a scoped print leaves the scope: a
+        chevron pointing in the direction of travel."""
         h, x1 = cell["h"], x0 + bw
         top, bottom = conn_y - h / 2, conn_y + h / 2
         pt.c.polygon([(x0, top), (x1 - TIP, top), (x1, conn_y), (x1 - TIP, bottom), (x0, bottom), (x0 + TIP, conn_y)],
                      fill=HEADER_FILL, stroke=0, width=1.0)
-        pt.report.chevron_boxes.append((pt.page_no, cell["kind"], x0, top, x1, bottom,
+        kind = f"edge-{cell['kind']}" if cell.get("edge") else cell["kind"]
+        pt.report.chevron_boxes.append((pt.page_no, kind, x0, top, x1, bottom,
                                         " ".join(t for t, _b, _f in cell["lines"])))
         ty = conn_y - len(cell["lines"]) * m.lh / 2
         for text, bold, fill in cell["lines"]:
             pt.text(x0 + bw / 2, ty, text, bold, fill=fill, align="center")
             ty += m.lh
+
+    def _tone(self, hex_value):
+        """A cable's colour as printed: itself, or in a black and white printout the grey of the same lightness."""
+        if self.spec.color:
+            return hex_value
+        r, g, b = (int(hex_value[i:i + 2], 16) for i in (0, 2, 4))
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255
 
     def _cable_line(self, c, link, points):
         for k, cable in enumerate(link.cables):
@@ -471,7 +537,7 @@ class Engine:
             pts = [(x, y + off) for x, y in points]
             if cable.color_hex:
                 c.polyline(pts, stroke=0, width=3.0, join="round")
-                c.polyline(pts, stroke=cable.color_hex, width=1.6, join="round")
+                c.polyline(pts, stroke=self._tone(cable.color_hex), width=1.6, join="round")
             else:
                 c.polyline(pts, stroke=0, width=1.4, join="round")
 
@@ -482,7 +548,7 @@ class Engine:
         for k, (cable, text) in enumerate(lines):
             w = m.width(text, True)
             if cable.color_hex and k == [c for c, _ in lines].index(cable):
-                pt.c.rect(cx - w / 2 - 10, top + k * m.lh + 2.5, 7, 5, fill=cable.color_hex, stroke=0, width=0.6)
+                pt.c.rect(cx - w / 2 - 10, top + k * m.lh + 2.5, 7, 5, fill=self._tone(cable.color_hex), stroke=0, width=0.6)
             pt.text(cx, top + k * m.lh, text, True, align="center")
 
     def _details_below(self, pt, m, link, x, top, width, wide):

@@ -18,7 +18,9 @@ from .extend import Chain
 from . import catalogue
 from .forms import PrintOptionsForm, PrintProfileForm, pick_form
 from .layout import LayoutSpec, render as render_pdf
+from .pdf.paper import parse_choice
 from .models import PrintProfile
+from .scope import apply_scope, scopes_of
 from .selection import apply_selection
 from .tables import PrintProfileTable
 
@@ -49,12 +51,24 @@ def _pickers(active=None, current=None):
     return out
 
 
+CARRIED = ("paper", "orientation", "profile", "prepared_for")     # print settings that survive choosing another object
+
+
+def _carried(request):
+    """The print settings in a request, as a query string for the page that follows."""
+    kept = [(k, request.GET[k]) for k in CARRIED if request.GET.get(k)]
+    return urlencode(kept)
+
+
 class IndexView(KindPermissionMixin, View):
     def get(self, request):
-        # The start page is the print page with nothing chosen yet: one layout, one place to choose.
+        # The start page is the print page with nothing chosen yet: one layout, one place to choose. The print
+        # bar is there already; its settings are carried to the print page when something is chosen.
         kind = request.GET.get("kind")
+        profiles = PrintProfile.objects.restrict(request.user, "view")
+        form = PrintOptionsForm(request.GET or None, profile_choices=[(str(p.pk), p.name) for p in profiles])
         return render(request, "netbox_trace_print/print.html", {
-            "object": None, "pickers": _pickers(kind if kind in kinds() else None), "version": __version__})
+            "object": None, "pickers": _pickers(kind if kind in kinds() else None), "form": form})
 
 
 class OptionsView(KindPermissionMixin, View):
@@ -74,11 +88,13 @@ class PickView(KindPermissionMixin, View):
 
     def get(self, request, kind):
         form = pick_form(kind)(request.GET or None)
+        carried = _carried(request)
         if form.is_valid():
-            return redirect(reverse("plugins:netbox_trace_print:print", kwargs={"kind": kind, "pk": form.cleaned_data["object"].pk}))
+            url = reverse("plugins:netbox_trace_print:print", kwargs={"kind": kind, "pk": form.cleaned_data["object"].pk})
+            return redirect(url + (f"?{carried}" if carried else ""))
         if request.GET.get("object"):
             messages.error(request, "That object has no cable, so there is no trace to print.")
-        return redirect(reverse("plugins:netbox_trace_print:index") + f"?kind={kind}")
+        return redirect(reverse("plugins:netbox_trace_print:index") + f"?kind={kind}" + (f"&{carried}" if carried else ""))
 
 
 def _object(request, kind, pk):
@@ -163,6 +179,7 @@ def _prepare(request, kind, pk):
     profile = next((p for p in profiles if str(p.pk) == data.get("profile")), None)
     keys, layout_name = _choose_keys(request, profile)
     result = chain = None
+    scopes, scope = [], ""
     if path:
         collector = Collector(request.user)
         service = _service(kind)
@@ -171,12 +188,19 @@ def _prepare(request, kind, pk):
         else:
             chain = Chain(request.user, path, before=request.GET.getlist("before"), after=request.GET.getlist("after"))
             doc = collector.chain_doc(chain.parts(collector), origin_label=str(obj))
+        scopes = scopes_of(doc)                    # decided on the full document, before any fact is hidden
+        form.set_scopes(scopes)
+        scope = request.GET.get("scope", "")
+        scope = scope if scope in {s["value"] for s in scopes} else ""
+        if scope:
+            doc = apply_scope(doc, scope)
         doc = apply_selection(doc, keys, layout_name=layout_name, prepared_for=data.get("prepared_for", ""))
-        pdf, report = render_pdf(doc, LayoutSpec(paper=data["paper"], orientation=data["orientation"]))
+        paper, color = parse_choice(data["paper"])
+        pdf, report = render_pdf(doc, LayoutSpec(paper=paper, orientation=data["orientation"], color=color))
         result = {"doc": doc, "pdf": pdf, "report": report}
     return {"obj": obj, "form": form, "data": data, "path": path, "result": result, "keys": keys,
             "profile": profile, "layout_name": layout_name, "chain": chain, "needs_pair": needs_pair,
-            "pair_count": len(pairs)}
+            "pair_count": len(pairs), "scopes": scopes, "scope": scope}
 
 
 def _pdf_query(prep):
@@ -187,6 +211,8 @@ def _pdf_query(prep):
         pairs.append(("path", prep["path"].pk))
     if prep["profile"]:
         pairs.append(("profile", prep["profile"].pk))
+    if prep["scope"]:
+        pairs.append(("scope", prep["scope"]))
     if data.get("prepared_for"):
         pairs.append(("prepared_for", data["prepared_for"]))
     pairs.append(("custom", 1))
@@ -244,10 +270,10 @@ class PrintView(KindPermissionMixin, View):
         return render(request, "netbox_trace_print/print.html", {
             "object": prep["obj"], "kind": kind, "label": kinds()[kind][2], "form": prep["form"], "path": prep["path"],
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
-            "pdf_url": pdf_url, "version": __version__, "groups": groups, "layout_name": prep["layout_name"],
+            "pdf_url": pdf_url, "groups": groups, "layout_name": prep["layout_name"],
             "needs_pair": prep["needs_pair"], "pair_count": prep["pair_count"],
             "selected": len(prep["keys"]), "total": len(catalogue.all_keys()), "pickers": _pickers(kind, prep["obj"]),
-            "ext": _extension(request, prep),
+            "ext": _extension(request, prep), "has_scopes": bool(prep["scopes"]), "scope": prep["scope"],
         })
 
 

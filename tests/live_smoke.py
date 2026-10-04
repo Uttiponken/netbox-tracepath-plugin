@@ -8,6 +8,7 @@ It creates a throw-away restricted user and permissions and removes them again.
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import Client
+import re as _re2
 
 from circuits.models import CircuitTermination
 from dcim.models import Cable, Device, FrontPort, Interface
@@ -31,26 +32,58 @@ ct = CircuitTermination.objects.get(circuit__cid="NF-BRG-0001", term_side="Z")
 
 c = Client()
 c.force_login(admin)
+import re as _re3
+import zlib as _zlib
+
+
+def _chromatic(pdf):
+    text = b"".join(_zlib.decompress(m.group(1)) for m in _re3.finditer(rb"stream\r?\n(.*?)\r?\nendstream", pdf, _re3.S)
+                    if m.group(1)[:1] == b"x").decode("latin-1")
+    return [op for op in _re3.findall(r"(-?[0-9.]+) (-?[0-9.]+) (-?[0-9.]+) (?:RG|rg)\b", text) if len(set(op)) > 1]
+
+
 print("== administrator")
 r = c.get("/plugins/trace-print/", HTTP_HOST=HOST)
 check("index 200", r.status_code == 200 and b"Interface" in r.content and b"Circuit termination" in r.content, r.status_code)
-check("the start page is the print page with nothing chosen: hint on the left, picker on the right, no options yet",
+check("the start page is the print page with nothing chosen: hint on the left, picker on the right",
       b"Choose what to trace in the menu on the right" in r.content and b"<object" not in r.content
-      and b'name="paper"' not in r.content and b"order-xl-2" in r.content, r.status_code)
+      and b"order-xl-2" in r.content, r.status_code)
+body = r.content.decode()
+check("the print bar is there from the start, above both columns, with its buttons switched off until something is chosen",
+      'id="print-bar"' in body and body.index('id="print-bar"') < body.index("Choose what to trace")
+      and all(f'name="{n}"' in body for n in ("profile", "paper", "orientation", "prepared_for"))
+      and _re2.search(r'name="apply"[^>]*\sdisabled', body) and _re2.search(r'data-bs-target="#facts-panel"[^>]*\sdisabled', body)
+      and "Manage profiles" in body and 'id="facts-panel"' not in body, r.status_code)
 r = c.get("/plugins/trace-print/interface/", HTTP_HOST=HOST)
 check("picker address redirects to the start page", r.status_code == 302, r.status_code)
 r = c.get(f"/plugins/trace-print/interface/?object={iface.pk}", HTTP_HOST=HOST)
 check("picker redirects to the print page", r.status_code == 302 and r["Location"].endswith(f"/interface/{iface.pk}/"), (r.status_code, r.get("Location")))
 r = c.get(f"/plugins/trace-print/interface/{iface.pk}/", HTTP_HOST=HOST)
 check("print page 200 embeds the pdf", r.status_code == 200 and b"application/pdf" in r.content and b"/pdf/" in r.content, r.status_code)
-check("the preview is on the left (first in the page), the options on the right",
-      r.content.index(b"<object") < r.content.index(b'name="paper"') and b"order-xl-1" in r.content.split(b"<object")[0][-400:])
+check("the print bar is at the top, then the preview on the left and the menu on the right",
+      r.content.index(b'id="print-bar"') < r.content.index(b"<object") and b"order-xl-1" in r.content.split(b"<object")[0][-400:]
+      and r.content.index(b'name="paper"') < r.content.index(b"<object") < r.content.index(b"order-xl-2"))
 r = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/", HTTP_HOST=HOST)
 check("pdf is a pdf, inline", r.status_code == 200 and r.content.startswith(b"%PDF") and r["Content-Type"] == "application/pdf"
       and r["Content-Disposition"].startswith("inline"), (r.status_code, r.get("Content-Disposition")))
 r = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?download=1&paper=A3&orientation=portrait", HTTP_HOST=HOST)
 check("download as attachment, A3 portrait", r.status_code == 200 and r["Content-Disposition"].startswith("attachment")
       and b"/MediaBox [0 0 841.89 1190.551]" in r.content, r.get("Content-Disposition"))
+print("== colour or black and white, chosen with the paper")
+page = c.get(f"/plugins/trace-print/interface/{iface.pk}/", HTTP_HOST=HOST).content.decode()
+check("every paper is offered in colour and in black and white",
+      all(f"{p} (Color)" in page and f"{p} (B/W)" in page for p in ("A4", "A3", "Letter", "Tabloid")) and 'value="A4:bw"' in page)
+r_c = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=A4", HTTP_HOST=HOST)
+r_b = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=A4:bw", HTTP_HOST=HOST)
+check("A4 (Color) prints coloured cables, A4 (B/W) prints grey tones only, on the same A4 landscape page",
+      r_c.status_code == r_b.status_code == 200 and _chromatic(r_c.content) and not _chromatic(r_b.content)
+      and b"/MediaBox [0 0 841.89 595.276]" in r_b.content, (r_c.status_code, r_b.status_code))
+cs_id = PrintProfile.objects.get(name="Customer-safe").pk
+check("the colour comes from the paper choice, not from the profile: Customer-safe (no Colour fact) prints in colour on A4 (Color)",
+      _chromatic(c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=A4&profile={cs_id}", HTTP_HOST=HOST).content)
+      and not _chromatic(c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=A4:bw&profile={cs_id}", HTTP_HOST=HOST).content))
+check("the same request gives the same colour every time (no race: what is printed depends only on the request)",
+      all(bool(_chromatic(c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=A4", HTTP_HOST=HOST).content)) for _ in range(4)))
 r = c.get(f"/plugins/trace-print/interface/{iface.pk}/pdf/?paper=Folio", HTTP_HOST=HOST)
 check("invalid paper falls back to the default instead of failing", r.status_code == 200 and b"/MediaBox [0 0 841.89 595.276]" in r.content, r.status_code)
 r = c.get(f"/plugins/trace-print/front-port/{fp.pk}/", HTTP_HOST=HOST)
@@ -126,7 +159,7 @@ page = c.get(f"/plugins/trace-print/cable/{trunk.pk}/", HTTP_HOST=HOST).content.
 check("a trunk with several pairs asks which pair first, and shows no preview",
       "trunk with 4 pairs in use" in page and "<object" not in page)
 check("the pair and direction choice sits under the cable dropdown in 'What to trace', not in the Paper card",
-      page.index('name="path"') < page.index('name="paper"') and page.index('name="path"') > page.index('id="pick-cable"')
+      page.index('name="path"') > page.index('id="pick-cable"') and page.index('name="path"') > page.index('id="print-bar"')
       and 'form="options-form"' in page and page.count('name="path"') == 1)
 check("it has its own button that submits the whole options form", 'type="submit" form="options-form"' in page and 'id="options-form"' in page)
 check("the choice is grouped by pair, both directions each",
@@ -177,9 +210,20 @@ check("choosing a profile ticks exactly its facts", r.status_code == 200 and 'va
       and 'value="device.ipv4" id="f-device.ipv4" checked' not in body and "Layout: Field technician" in body, r.status_code)
 r = c.get(base + f"?profile={tech.pk}&custom=1&fields=device.serial", HTTP_HOST=HOST)
 check("an adjusted selection is named as such", b"Field technician (adjusted)" in r.content)
-check("the fact choices are in a collapsed section (closed by default) with the summary line outside the checkboxes",
-      b'<details id="facts">' in r.content and b'<details id="facts" open' not in r.content
-      and r.content.index(b'id="facts"') < r.content.index(b'name="fields"') and b"(click to choose the facts)" in r.content)
+check("the fact choices are in a panel that is closed by default, opened by a Choose facts button; no summary text",
+      b'class="collapse w-100" id="facts-panel"' in r.content and b"collapse w-100 show" not in r.content
+      and r.content.index(b'data-bs-target="#facts-panel"') < r.content.index(b'name="fields"')
+      and b"Choose facts" in r.content and b"(click to choose the facts)" not in r.content and b"facts \xc2\xb7 printed as" not in r.content)
+bar_html = r.content.decode()
+check("the print bar's buttons run Apply profile, Manage profiles, Choose facts, Update, all as high as the fields",
+      [bar_html.index(x) for x in ("Apply profile", "Manage profiles", "Choose facts")] == sorted(bar_html.index(x) for x in ("Apply profile", "Manage profiles", "Choose facts"))
+      and "#print-bar .btn { height: 40px;" in bar_html)
+check("the short lists are plain selects: no searchable dropdown, so no cursor in a choice and no height changes",
+      all(_re2.search(r'<select name="%s"[^>]*class="[^"]*\bno-ts\b' % n, bar_html) or _re2.search(r'<select name="%s"[^>]*\bno-ts\b' % n, bar_html)
+          for n in ("profile", "paper", "orientation")))
+check("the object selectors get their search box inside the dropdown (TomSelect dropdown_input)", "dropdown_input" in bar_html and "select.api-select" in bar_html)
+check("Enter in a text field does a plain Update: the first submit button of the print bar is not Apply profile",
+      r.content.index(b'class="visually-hidden"') < r.content.index(b'name="apply"'))
 r = c.get(base + "?custom=1", HTTP_HOST=HOST)
 check("ticking nothing is respected", r.status_code == 200 and b"0 of" in r.content and b"Custom selection" in r.content)
 r = c.get(base + "?custom=1&fields=device.serial&fields=not.a.key", HTTP_HOST=HOST)
@@ -195,7 +239,31 @@ cust = pdf_text(f"?profile={PrintProfile.objects.get(name='Customer-safe').pk}")
 check("customer-safe print is smaller than the full one", len(cust) < len(full), (len(cust), len(full)))
 r = c.get(base + "pdf/?prepared_for=" + "J.+Smith", HTTP_HOST=HOST)
 check("prepared-for is accepted", r.status_code == 200)
-check("print page links to the profiles", b"Print profiles" in c.get("/plugins/trace-print/", HTTP_HOST=HOST).content)
+from django.urls import reverse as _reverse
+profiles_url = _reverse("plugins:netbox_trace_print:printprofile_list")
+for name, where in (("start page", "/plugins/trace-print/"), ("print page", base)):
+    html = c.get(where, HTTP_HOST=HOST).content.decode()
+    button = _re2.search(r'<a class="([^"]*)" href="([^"]*)">\s*<i class="mdi mdi-cog[^"]*"></i> Manage profiles\s*</a>', html)
+    check(f"the print bar has a Manage profiles button to the profile list ({name})",
+          bool(button) and button.group(2) == profiles_url and "btn" in button.group(1), button and button.groups())
+    check(f"the What to trace card has no footer with the plugin name and version, and there is no page count card ({name})",
+          "netbox-trace-print 0." not in html and "pt text" not in html and "card-footer" not in html.split('id="print-bar"')[-1].split("What to trace")[-1].split("Extend the trace")[0])
+    check(f"no template comment text leaks onto the page ({name})", "{#" not in html and "#}" not in html and "{%" not in html)
+print("== print settings survive choosing another object")
+r = c.get(f"/plugins/trace-print/interface/?object={iface.pk}&paper=A3&orientation=portrait&profile={tech.pk}&prepared_for=J.+Smith&junk=1", HTTP_HOST=HOST)
+loc = r.get("Location", "")
+check("the selectors pass paper, orientation, profile and prepared-for on to the print page, and nothing else",
+      r.status_code == 302 and loc.startswith(f"/plugins/trace-print/interface/{iface.pk}/?") and "paper=A3" in loc and "orientation=portrait" in loc
+      and f"profile={tech.pk}" in loc and "prepared_for=J." in loc and "junk" not in loc, loc)
+page = c.get(loc, HTTP_HOST=HOST).content.decode()
+check("and the print bar shows them", _re2.search(r'<option value="A3"\s+selected', page) and _re2.search(r'<option value="portrait"\s+selected', page)
+      and 'value="J. Smith"' in page and _re2.search(r'<option value="%d"\s+selected' % tech.pk, page))
+check("a page opened with only some options shows the defaults for the rest (A4, landscape), not the first choice",
+      _re2.search(r'<option value="A4"\s+selected', c.get(base + f"?profile={tech.pk}", HTTP_HOST=HOST).content.decode()))
+r = c.get("/plugins/trace-print/interface/?object=999999999&paper=A3", HTTP_HOST=HOST)
+check("a refused choice goes back to the start page, keeping the settings", r.status_code == 302 and "kind=interface" in r["Location"] and "paper=A3" in r["Location"], r.get("Location"))
+check("the selectors carry the settings on with a few lines of script", "form.tp-pick" in c.get("/plugins/trace-print/", HTTP_HOST=HOST).content.decode()
+      and 'class="tp-pick"' in c.get("/plugins/trace-print/", HTTP_HOST=HOST).content.decode())
 mine.delete()
 check("profile can be deleted", not PrintProfile.objects.filter(name="tp-smoke").exists())
 
@@ -264,7 +332,8 @@ body = r.content.decode()
 check("opened, it lists the other ports on the end equipment, grouped by where they lead",
       "At the end: baltic-retail-sto-sw-01" in body and "sto-sw-01" in body and "after=" in body and "Ethernet49" in body, r.status_code)
 check("and the start equipment, which has the iDRAC/management port to the OOB switch", "At the start: baltic-retail-sto-srv-01" in body and "sto-oob-01" in body)
-card = body[body.index("Extend the trace"):body.index('id="options-form"')]
+card = body[body.index("Extend the trace"):]
+card = card[:card.index("Limit the print to")] if "Limit the print to" in card else card
 heads = [m_ for m_ in __import__("re").findall(r'<h3 class="([^"]*)">(At the (?:start|end)[^<]*)</h3>', card)]
 check("the At the start / At the end headings are larger than the equipment headings below them, with a line between the two sections",
       len(heads) == 2 and all("fs-5" in cls and "fw-bold" in cls for cls, _t in heads) and 'class="small fw-bold mt-2"' in card
@@ -309,6 +378,53 @@ check("with in and out ports the right way round",
       and [(r_.in_name, r_.out_name) for r_ in bdoc.blocks[6].ports] == [("xe-0/1/0", "et-0/0/0")], [[(r_.in_name, r_.out_name) for r_ in b.ports] for b in bdoc.blocks])
 both = Chain(user, ct_base, before=[pid("sto-rtr-01", "xe-0/1/0")], after=[pid("mma-rtr-01", "xe-0/1/0")])
 check("both ends at once", len(both.before) == 1 and len(both.after) == 1)
+
+print("== scoped prints")
+from urllib.parse import quote_plus
+from netbox_trace_print.scope import apply_scope as _apply_scope, scopes_of as _scopes_of
+from netbox_trace_print.selection import apply_selection as _select
+
+sth = Interface.objects.get(device__name="sto-rtr-01", name="et-0/0/2")           # Stockholm to Helsinki over NSN
+base_url = f"/plugins/trace-print/interface/{sth.pk}/"
+full = Collector(admin).trace_doc(paths_through(sth)[0])
+found = _scopes_of(full)
+labels = [x["label"] for x in found]
+check("the scopes are the places the path passes through, sites first",
+      [l for l in labels if l.startswith("Site: ")] == ["Site: Nordfiber Stockholm DC", "Site: Nordfiber Helsinki DC"]
+      and labels == sorted(labels, key=lambda l: ["Sit", "Loc", "Rac"].index(l[:3])) and any(l.endswith("STO-MM-01") for l in labels), labels)
+mm = next(x["value"] for x in found if x["label"].endswith("STO-MM-01"))
+d = _apply_scope(full, mm)
+inner = [b for b in d.blocks if not b.kind.startswith("edge")]
+check("a rack scope keeps that rack's blocks between two edge markers",
+      d.blocks[0].kind == "edge-in" and d.blocks[-1].kind == "edge-out" and len(d.segments) == 1 and len(inner) >= 2
+      and all(b.rack == "STO-MM-01" for b in inner) and len(d.links) == len(d.blocks) - 1, [(b.kind, b.title) for b in d.blocks])
+check("  the markers name the equipment just outside, with its port",
+      d.blocks[0].title == full.blocks[full.blocks.index(next(b for b in full.blocks if b.title == inner[0].title)) - 1].title
+      and d.blocks[0].subtitle == "Enters rack STO-MM-01" and d.blocks[-1].subtitle == "Leaves rack STO-MM-01"
+      and d.blocks[0].ports[0].out_name and d.blocks[-1].ports[0].in_name, [(b.subtitle, b.title) for b in (d.blocks[0], d.blocks[-1])])
+site = next(x["value"] for x in found if x["label"] == "Site: Nordfiber Stockholm DC")
+d = _apply_scope(full, site)
+check("a site scope ends at the border with a marker for the equipment in the other site",
+      d.blocks[0].kind != "edge-in" and d.blocks[-1].kind == "edge-out" and d.blocks[-1].site == "Nordfiber Helsinki DC", d.blocks[-1].site)
+d = _select(_apply_scope(full, mm), set(PrintProfile.objects.get(name="Customer-safe").keys))
+check("a hidden rack is hidden on the markers too (Customer-safe shows the site only), the scope line stays",
+      d.blocks[0].rack == "" and bool(d.blocks[0].site) and any(l.startswith("Scope:") for l in d.summary), d.summary)
+
+page = c.get(base_url, HTTP_HOST=HOST).content.decode()
+check("the print page offers a Scope card with the places, grouped by kind",
+      "Limit the print to" in page and '<optgroup label="Site">' in page and '<optgroup label="Rack">' in page
+      and "Whole path" in page and "STO-MM-01" in page)
+page = c.get(base_url + "?scope=" + quote_plus(mm), HTTP_HOST=HOST).content.decode()
+check("a chosen scope is selected and carried to the pdf address",
+      _re2.search(r'<option value="' + _re2.escape(mm) + r'"\s+selected', page) and "scope=rack%3A" in page and "<object" in page)
+r = c.get(base_url + "pdf/?scope=" + quote_plus(mm), HTTP_HOST=HOST)
+check("it prints as a pdf", r.status_code == 200 and r.content.startswith(b"%PDF"), r.status_code)
+bad = c.get(base_url + "?scope=rack%3Anowhere", HTTP_HOST=HOST).content.decode()
+pdf_of = lambda html: (_re2.findall(r'<object data="([^"]*)"', html) or [""])[0]
+check("an unknown scope is ignored: the whole path prints", pdf_of(bad) and "scope=" not in pdf_of(bad))
+got_if = Interface.objects.get(device__name="polaris-got-sw-01", name="Ethernet49")       # never enters Stockholm
+other = c.get(f"/plugins/trace-print/interface/{got_if.pk}/?scope=" + quote_plus(mm), HTTP_HOST=HOST).content.decode()
+check("a scope the trace does not pass through is dropped", pdf_of(other) and "scope=" not in pdf_of(other))
 
 print("== WDM circuits and FMS fiber cables as starting points")
 from netbox_fms.models import FiberCable
@@ -417,6 +533,92 @@ try:
 finally:
     integrations.DISABLED.clear()
 check("with it, the kinds are back", "wdm-circuit" in __import__("netbox_trace_print.collect", fromlist=["x"]).kinds())
+
+print("== the Print trace button on NetBox's own pages")
+page_of = lambda obj: c.get(obj.get_absolute_url(), HTTP_HOST=HOST).content.decode()
+def button(html, kind, pk):
+    return _re2.search(r'<a href="/plugins/trace-print/%s/%d/" class="btn btn-primary" title="Print this trace as a PDF">\s*<i class="mdi mdi-printer"></i> Print trace' % (kind, pk), html)
+check("a cable's page has the button, and it opens that cable", button(page_of(cable), "cable", cable.pk))
+check("a cabled interface has it", button(page_of(iface), "interface", iface.pk))
+check("an interface without a cable has none (there is no trace)", "Print trace" not in page_of(uncabled_if))
+check("a cabled front port has it", button(page_of(fp), "front-port", fp.pk))
+check("a circuit termination with a cable has it", button(page_of(ct), "circuit-termination", ct.pk))
+check("the button leads to a working print page", c.get(f"/plugins/trace-print/cable/{cable.pk}/", HTTP_HOST=HOST).status_code == 200)
+check("netbox-fms fiber cables and fiber circuits have it", button(page_of(fc), "fiber-cable", fc.pk) and button(page_of(fcirc), "fiber-circuit", fcirc.pk))
+check("netbox-wdm circuits have it", button(page_of(fjord), "wdm-circuit", fjord.pk))
+integrations.DISABLED.update({"fms", "wdm"})
+try:
+    check("without netbox-fms and netbox-wdm their pages have no button, the cable page still has it",
+          "Print trace" not in page_of(fc) and "Print trace" not in page_of(fjord) and button(page_of(cable), "cable", cable.pk))
+finally:
+    integrations.DISABLED.clear()
+only_if = User.objects.create(username="tp-iface-only")
+perm_i = ObjectPermission.objects.create(name="tp-iface-only", actions=["view"])
+perm_i.object_types.set([ContentType.objects.get_for_model(Interface)])
+perm_i.users.add(only_if)
+try:
+    c3 = Client()
+    c3.force_login(only_if)
+    page = c3.get(iface.get_absolute_url(), HTTP_HOST=HOST)
+    check("a user who may view interfaces but not cables sees the page without the button",
+          page.status_code == 200 and b"Print trace" not in page.content, page.status_code)
+    perm_i.object_types.add(ContentType.objects.get_for_model(Cable))
+    check("and with permission to view cables the button appears", b"Print trace" in c3.get(iface.get_absolute_url(), HTTP_HOST=HOST).content)
+finally:
+    perm_i.delete()
+    only_if.delete()
+
+print("== the optional Print trace column in NetBox's own lists")
+from circuits.tables.circuits import CircuitTerminationTable
+from dcim.tables.cables import CableTable
+from dcim.tables.devices import DeviceFrontPortTable, DeviceInterfaceTable, FrontPortTable, InterfaceTable
+
+def link(html, kind, pk):
+    return _re2.search(r'href="/plugins/trace-print/%s/%d/" class="btn btn-sm btn-primary" title="Print trace as PDF"' % (kind, pk), html)
+
+lists = [("cables", CableTable, f"/dcim/cables/?id={cable.pk}", "cable", cable.pk),
+         ("interfaces", InterfaceTable, f"/dcim/interfaces/?id={iface.pk}", "interface", iface.pk),
+         ("a device's interfaces", DeviceInterfaceTable, f"/dcim/devices/{iface.device_id}/interfaces/?per_page=100", "interface", iface.pk),
+         ("front ports", FrontPortTable, f"/dcim/front-ports/?id={fp.pk}", "front-port", fp.pk),
+         ("a device's front ports", DeviceFrontPortTable, f"/dcim/devices/{fp.device_id}/front-ports/?per_page=100", "front-port", fp.pk),
+         ("circuit terminations", CircuitTerminationTable, f"/circuits/circuit-terminations/?id={ct.pk}", "circuit-termination", ct.pk)]
+for name, table, url, kind, pk in lists:
+    key = f"tables.{table.__name__}.columns"
+    before = admin.config.get(key)
+    try:
+        check(f"the column is not shown until a user chooses it ({name})", not link(c.get(url, HTTP_HOST=HOST).content.decode(), kind, pk))
+        admin.config.set(key, list(table.Meta.default_columns) + ["print_trace"], commit=True)
+        html = c.get(url, HTTP_HOST=HOST).content.decode()
+        check(f"chosen under Configure Table, every row has a printer icon that opens it in the print page ({name})", link(html, kind, pk) and "Print trace" in html, url)
+    finally:
+        if before is None:
+            admin.config.clear(key, commit=True)
+        else:
+            admin.config.set(key, before, commit=True)
+key = "tables.InterfaceTable.columns"
+before = admin.config.get(key)
+try:
+    admin.config.set(key, list(InterfaceTable.Meta.default_columns) + ["print_trace"], commit=True)
+    check("an interface without a cable gets no icon", not link(c.get(f"/dcim/interfaces/?id={uncabled_if.pk}", HTTP_HOST=HOST).content.decode(), "interface", uncabled_if.pk))
+    viewer = User.objects.create(username="tp-col-viewer")
+    perm_v = ObjectPermission.objects.create(name="tp-col-viewer", actions=["view"])
+    perm_v.object_types.set([ContentType.objects.get_for_model(Interface)])
+    perm_v.users.add(viewer)
+    try:
+        viewer.config.set(key, list(InterfaceTable.Meta.default_columns) + ["print_trace"], commit=True)
+        c4 = Client()
+        c4.force_login(viewer)
+        check("a user who may not view cables sees no icon", not link(c4.get(f"/dcim/interfaces/?id={iface.pk}", HTTP_HOST=HOST).content.decode(), "interface", iface.pk))
+    finally:
+        perm_v.delete()
+        viewer.delete()
+finally:
+    if before is None:
+        admin.config.clear(key, commit=True)
+    else:
+        admin.config.set(key, before, commit=True)
+from netbox.registry import registry as _registry
+check("the column is registered on all six tables", all("print_trace" in _registry["tables"][row[1]] for row in lists), [row[1].__name__ for row in lists])
 
 print("== a user with no permissions")
 nobody = User.objects.create(username="tp-nobody")

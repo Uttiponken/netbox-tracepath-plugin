@@ -2,14 +2,14 @@
 
 ## Steps
 
-1. **Printable trace. Done (0.1.0 to 0.5.0).** PDF output (standard library only, UTF-8), the "full
+1. **Printable trace. Done (0.1.0 to 0.6.0).** PDF output (standard library only, UTF-8), the "full
    information" layout, real traces from NetBox, one page to start and print, chevron markers where a trace
    continues on another page, choosing which facts to print by recipient (print profiles in the plugin's own
    tables), extending a trace at either end, and WDM circuits, fiber cables and fiber circuits as starting
-   points. See `CHANGELOG.md`.
+   points, and scoped prints with edge markers (0.6.0). See `CHANGELOG.md`.
 2. **Colour by site / location / rack**, so connection points are easy to find, and still fully
    readable in black and white (tint + pattern + text tag, never colour alone).
-3. **Further improvements**, among them scoped prints, bulk prints, cable end labels with QR codes,
+3. **Further improvements**, among them a page-break preference, bulk prints, cable end labels with QR codes,
    rack elevations with the U highlighted, a work-order mode, saved presets.
 
 ## Decisions so far
@@ -34,24 +34,36 @@
 - A trunk cable carries several pairs, so a printout always follows one pair and direction: the page asks
   for the pair first. Services (WDM and fiber circuits) print from their first to their last equipment and
   are not extended.
-- Cable colours are NetBox's own (the cable's Colour field); the plugin does not invent colours.
+- Cable colours are NetBox's own (the cable's Colour field); the plugin does not invent colours. Colour or black
+  and white is part of the paper choice (A4 (Color) / A4 (B/W)); in B/W the colours become grey tones. The Colour
+  fact only controls the colour's name, so a profile cannot switch colour off by accident.
 - Other plugins (netbox-fms, netbox-wdm) are optional: their facts and starting points exist only when they
   are installed, and an integration that fails is skipped and logged.
+- The print settings (profile, facts, paper size, orientation, prepared for) live in one bar at the top of the
+  page, always visible; the menu on the right is only for choosing what to trace, extending it and its scope.
 - Block = a parent object (device, circuit, provider network, site) with the ports the path uses on
   it, as in NetBox's own trace drawing.
 
-## Scoped prints (planned)
+## Scoped prints (done in 0.6.0)
 
-Print the full path first; then allow narrowing to the part of a cable or circuit that passes a
-site, location or rack (for example a technician at one data center doing fault analysis). The
-title keeps naming the connection; a scope line says what is shown, and every page repeats it.
+Print the full path first; then narrow to the part of a cable or circuit that passes a site, location or
+rack (for example a technician at one data center doing fault analysis). The title keeps naming the
+connection; a scope line says what is shown, and every page repeats it.
 
 Where the path leaves the scope, an **edge marker** is drawn: a chevron ("step" shape) pointing in
-the direction of travel, in the grid row of the neighbouring block and vertically centred on the
-cable, with the cable drawn between them like any other. The marker says where the path continues
-from or to (site, device and port). A path that leaves the scope and returns prints as separate
-segments ("Segment 1 of 2"). Sketch from the author: a 190 x 50 chevron, a 90-unit gap, then a
-120 x 60 block, all on one centre line.
+the direction of travel, a cell of the grid like the page-break markers, with the cable drawn between it
+and the neighbouring block like any other. The marker says where the path continues from or to (site,
+device and port). A path that leaves the scope and returns prints as separate segments ("Segment 1 of 2"),
+each on its own page. Decisions: a circuit or provider network is never inside a scope (it has no place of
+its own), so it shows up as the marker; a location or rack is identified together with the places it sits in,
+since names are only unique inside their parent; the scope is decided on the full document, before facts
+are hidden. The markers are the layout engine's existing chevron cells, not the fixed 190 x 50 shape of the
+first sketch, so they follow the grid on every paper size.
+
+## Page breaks (planned)
+
+An option to prefer page breaks at site changes and at long cables, so a printout splits where the
+technician's work does. To be discussed after the colours.
 
 ## Extending a trace (done in 0.4.0)
 

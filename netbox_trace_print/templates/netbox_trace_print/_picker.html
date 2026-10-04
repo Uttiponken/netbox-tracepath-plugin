@@ -13,7 +13,7 @@
 <div class="tab-content">
   {% for p in pickers %}
     <div class="tab-pane{% if p.active %} show active{% endif %}" id="pick-{{ p.slug }}" role="tabpanel">
-      <form method="get" action="{% url 'plugins:netbox_trace_print:pick' kind=p.slug %}">
+      <form method="get" class="tp-pick" action="{% url 'plugins:netbox_trace_print:pick' kind=p.slug %}">
         {% render_field p.form.object %}
         <button type="submit" class="btn btn-primary">Show trace</button>
       </form>

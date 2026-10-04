@@ -93,10 +93,12 @@ class SelectionTests(unittest.TestCase):
             self.assertIn("SITE-X", text)
             self.assertNotIn("RACK-SECRET", text)
 
-    def test_unselected_colour_also_removes_the_coloured_line(self):
+    def test_unselected_colour_hides_the_name_but_not_the_line(self):
+        # whether the line and swatch are coloured is the paper choice (colour or B/W), not a fact
         out = apply_selection(doc(), {"cable.type"})
-        self.assertEqual(out.links[0].cables[0].color_hex, "")
-        self.assertEqual(apply_selection(doc(), {"cable.colour"}).links[0].cables[0].color_hex, "ffeb3b")
+        self.assertEqual((out.links[0].cables[0].color_name, out.links[0].cables[0].color_hex), ("", "ffeb3b"))
+        kept = apply_selection(doc(), {"cable.colour"}).links[0].cables[0]
+        self.assertEqual((kept.color_name, kept.color_hex), ("Yellow", "ffeb3b"))
 
     def test_original_is_not_modified(self):
         d = doc()

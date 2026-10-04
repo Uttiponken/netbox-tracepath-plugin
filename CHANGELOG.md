@@ -2,6 +2,44 @@
 
 Releases are tagged `vX.Y.Z`; sample PDFs for each are in `samples/X.Y.Z/`.
 
+## 0.6.0
+
+**Scoped prints**
+- Limit a print to the part of the path in one site, location or rack (a *Scope* card on the print page). Edge
+  markers (chevrons) show where the path leaves or enters the scope, with the equipment, port, site and rack on
+  the other side and the crossing cable drawn. A path that leaves and returns is printed as segments, one page
+  each. The header says what the scope is and every page repeats it. The scope is part of the PDF address
+  (`scope=`), so a printout can be reproduced from its link.
+- New `scope.py` (pure Python) and layout support for segments and edge markers.
+
+**Colour or black and white**
+- Chosen with the paper: *A4 (Color)* and *A4 (B/W)* for every paper size (`paper=A4:bw` in the address). In B/W the
+  cable colours print as grey tones of the same lightness.
+- The *Colour* fact now only controls the colour's name; whether the line is coloured is the paper choice, so a
+  profile without the fact (Network engineer, Customer-safe) no longer turns the printout black and white by
+  surprise.
+
+**A print bar at the top of the page**
+- Always there, also before anything is chosen: profile, Apply profile, Manage profiles and Choose facts on the
+  left; Paper, Orientation, Prepared for and Update anchored to the right (wrapping on a narrow screen). It replaces
+  the Paper and What to print cards, so the menu on the right is shorter; the fact choices open as a panel in
+  columns. The page-count card and the plugin-version footer are gone.
+- The settings are kept when another object is chosen. A page opened with only some options shows the defaults
+  (A4, landscape) for the rest. Enter in a text field does a plain Update.
+- **Dropdowns that stay put.** The object selectors have their search box inside the list (clicking one opens it
+  with an empty search box; the chosen entry stays in the field, with no cursor) and the short lists are plain
+  dropdowns, so the menu no longer jumps up and down.
+
+**In NetBox's own pages**
+- A **Print trace** button on the pages of cables, interfaces, front ports and circuit terminations (and netbox-fms
+  fiber cables and fiber circuits, netbox-wdm circuits): it opens that object in the print page. Shown only to
+  users who may view cables, and only when a cable is attached.
+- An optional **Print trace** column in NetBox's lists of cables, interfaces, front ports and circuit terminations
+  (a printer icon per row). Off until a user adds it with Configure Table.
+
+**Also**
+- The README shows an example printout; the documentation is brought up to date.
+
 ## 0.5.1
 
 - "Extend the trace": the *At the start* and *At the end* headings are larger, with a line between the two

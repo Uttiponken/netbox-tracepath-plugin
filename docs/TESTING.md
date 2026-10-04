@@ -47,7 +47,7 @@ docker compose ... exec netbox sh -c "cd /opt/netbox/netbox && python manage.py 
 | `tests/live_smoke.py` | Every page and behaviour through Django's test client: pickers, trunk pairs, profiles, extending, WDM and FMS, permissions. Creates a throw-away user and removes it. Ends with `ALL OK` or a list of failures. |
 | `tests/live_render.py` | Real traces from the data, rendered to PDF in `out/` (ignored by git). |
 | `tests/live_profiles.py` | One real trace printed with each print profile. |
-| `tests/live_wdm.py`, `tests/live_fms.py` | WDM circuits, fiber circuits and a trunk pair, printed into `samples/<version>/`. |
+| `tests/live_wdm.py`, `tests/live_fms.py`, `tests/live_scope.py` | WDM circuits, fiber circuits and a trunk pair, and scoped prints, printed into `samples/<version>/`. |
 
 ## Sample PDFs
 

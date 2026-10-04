@@ -1,21 +1,24 @@
 # Architecture
 
-A printout goes through four steps. Each hands plain data to the next, so the middle of the plugin
+A printout goes through these steps. Each hands plain data to the next, so the middle of the plugin
 (everything but the first step) is ordinary Python that can be tested without a database.
 
 ```
-NetBox objects ──collect──▶ TraceDoc ──selection──▶ TraceDoc ──layout──▶ PDF bytes
- (CablePath, devices,      (blocks, links,         (only the facts      (pages, columns,
-  cables, ports,            notes, header)          that were chosen)    fonts, chevrons)
-  other plugins' data)
+NetBox objects ──collect──▶ TraceDoc ──scope──▶ TraceDoc ──selection──▶ TraceDoc ──layout──▶ PDF bytes
+ (CablePath, devices,      (blocks, links,    (optional: only      (only the facts      (pages, columns,
+  cables, ports,            notes, header)     one site, location   that were chosen)    fonts, chevrons)
+  other plugins' data)                         or rack)
 ```
 
 | Step | Module | Needs Django? |
 |---|---|---|
 | Choose what to trace, paths, options, the web pages | `views.py`, `forms.py`, `options.py`, `extend.py`, `urls.py`, `templates/` | yes |
 | Read NetBox into a `TraceDoc` | `collect.py` (+ `integrations/`) | yes |
+| Limit to a site, location or rack | `scope.py` | no |
 | Keep only the chosen facts | `selection.py`, `fields.py` (the catalogue and the built-in profiles) | no |
 | Draw it | `layout.py`, `model.py`, `pdf/` | no |
+| A "Print trace" button on NetBox's own pages | `template_content.py`, `templates/.../inc/print_button.html` | yes |
+| An optional "Print trace" column in NetBox's lists | `table_columns.py` (registered in `ready()`) | yes |
 | Print profiles in the database | `models.py`, `tables.py`, `migrations/` | yes |
 
 ## The data (`model.py`)
@@ -38,6 +41,16 @@ chooses the parts).
 Objects the user may not view appear by name only (`Details restricted`). Cable colours are not decided here:
 a cable is drawn in the colour NetBox stores on it, named from NetBox's own colour list.
 
+## Scoped prints (`scope.py`)
+
+`scope.apply_scope(doc, value)` keeps the blocks that are in one site, location or rack and replaces the
+neighbours outside with *edge markers*: blocks of kind `edge-in` / `edge-out` that carry the neighbour's name,
+port, site and rack. The document gets `segments` (runs of blocks, each printed on its own pages) and a `scope`
+line; between two segments an empty `Link` keeps `len(links) == len(blocks) - 1`. It runs on the full
+document, before `selection`, because the scope must be decided on the real places and the selection then hides
+a marker's site and rack if those facts are not printed. The layout draws an edge marker as a chevron cell and
+starts every segment on a new page.
+
 ## Facts and profiles (`fields.py`, `selection.py`, `models.py`)
 
 `fields.GROUPS` is the catalogue of core facts, `fields.PLUGIN_GROUPS` those that other plugins provide.
@@ -53,6 +66,8 @@ real font, wraps it inside its block (nothing is cut off), lays the blocks on a 
 text, and takes as many rows as fit on each page. If a row does not fit it first uses fewer, wider columns and
 only then a smaller font (7 pt at the smallest); anything that still cannot fit is reported in
 `LayoutReport.warnings`. Where a trace continues on another page, chevron markers are cells of the grid.
+`LayoutSpec.color` is the colour or black and white choice: with `color=False` every cable colour is drawn as the
+grey of the same lightness (`Engine._tone`); the paper choice `A4:bw` means A4 with `color=False`.
 `pdf/` is a standard-library PDF writer: a TrueType subsetter (`ttf.py`), the bundled DejaVu fonts, paper sizes
 and a small canvas. There are no runtime dependencies.
 

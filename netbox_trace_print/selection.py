@@ -30,11 +30,11 @@ def apply_selection(doc, keys, layout_name="", prepared_for=""):
     for link in doc.links:
         for cable in link.cables:
             cable.fields = keep(cable.fields)
-            if "cable.colour" not in keys:
-                cable.color_hex = cable.color_name = ""
+            if "cable.colour" not in keys:          # the colour's name; whether the line is coloured is the paper choice
+                cable.color_name = ""
 
     if doc.summary_items:
-        doc.summary = [text for key, text in doc.summary_items if key in keys]
+        doc.summary = [text for key, text in doc.summary_items if not key or key in keys]   # "" = always printed
     if doc.footer_items:
         parts = [text for key, text in doc.footer_items if key in keys]
         if layout_name:

@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 
 class TraceprintConfig(PluginConfig):
@@ -14,6 +14,11 @@ class TraceprintConfig(PluginConfig):
     max_version = "4.6.99"
     # No settings yet. Every option (paper, orientation, fields) is chosen when printing.
     default_settings = {}
+
+    def ready(self):
+        super().ready()
+        from .table_columns import register
+        register()
 
 
 config = TraceprintConfig

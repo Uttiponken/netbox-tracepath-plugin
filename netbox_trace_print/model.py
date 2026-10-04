@@ -39,7 +39,8 @@ class Block:
     title: str
     subtitle: str = ""
     subtitle_key: str = ""                     # catalogue key for the subtitle; "" = always shown
-    kind: str = "device"                       # device | circuit | provider-network | site
+    kind: str = "device"                       # device | circuit | provider-network | site | edge-in | edge-out
+                                               # (an edge marker stands for the equipment just outside a scope)
     ports: list = field(default_factory=list)  # PortRow
     fields: list = field(default_factory=list)  # object details, shown as an aligned label/value grid
     # Where the block is, as plain names. Not drawn by themselves; used to colour by
@@ -63,6 +64,13 @@ class Link:
 
 
 @dataclass
+class Segment:
+    """A run of blocks printed together: indexes into TraceDoc.blocks, inclusive. See scope.py."""
+    first: int
+    last: int
+
+
+@dataclass
 class TraceDoc:
     title: str
     summary: list = field(default_factory=list)   # header lines under the title (strings)
@@ -73,3 +81,7 @@ class TraceDoc:
     # The same text as `summary` and `footer`, as (catalogue key, text) so a selection can drop parts.
     summary_items: list = field(default_factory=list)
     footer_items: list = field(default_factory=list)
+    # A scoped print (scope.py): what the print is limited to, and the runs of blocks that are shown. Each
+    # segment starts on a new page. Empty = the whole path, one segment.
+    scope: str = ""
+    segments: list = field(default_factory=list)

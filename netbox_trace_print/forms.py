@@ -6,7 +6,8 @@ from utilities.forms.rendering import FieldSet
 from utilities.forms.widgets import APISelect
 
 from .collect import kinds, model_for
-from .pdf.paper import ORIENTATIONS, PAPER_MM
+from .pdf.paper import CHOICES as PAPER_CHOICES, ORIENTATIONS
+from .scope import KINDS
 
 
 def pick_form(kind):
@@ -35,17 +36,29 @@ def pick_form(kind):
 
 
 class PrintOptionsForm(forms.Form):
-    paper = forms.ChoiceField(choices=[(p, p) for p in PAPER_MM], initial="A4")
+    paper = forms.ChoiceField(choices=PAPER_CHOICES, initial="A4", label="Paper")
     orientation = forms.ChoiceField(choices=[(o, o.capitalize()) for o in ORIENTATIONS], initial="landscape")
     path = forms.ChoiceField(required=False, label="Path")
     profile = forms.ChoiceField(required=False, label="Profile",
                                 help_text="Which facts to print. Pick one and press Apply, then adjust below.")
     prepared_for = forms.CharField(required=False, max_length=100, label="Prepared for",
                                    help_text="Optional. Printed under the title.")
+    scope = forms.ChoiceField(required=False, label="Limit the print to",
+                              help_text="Print only the part of the path in one site, location or rack. Where the path "
+                                        "leaves it, a marker says where it continues.")
 
     def __init__(self, *args, path_choices=(), path_count=None, path_label="", profile_choices=(), **kwargs):
         """`path_choices` may be grouped ((group, ((value, label), ...)), ...), as for a trunk cable's pairs."""
         super().__init__(*args, **kwargs)
+        if self.is_bound:                          # a page opened with some options still shows the defaults for the rest
+            self.data = self.data.copy()
+            self.data.setdefault("paper", "A4")
+            self.data.setdefault("orientation", "landscape")
+        # The print bar is laid out by hand, so its widgets get their look here. The short lists are plain selects
+        # (class no-ts keeps NetBox's searchable dropdown off them): no cursor in a choice, no height changes.
+        for name in ("profile", "paper", "orientation", "path", "scope"):
+            self.fields[name].widget.attrs["class"] = "form-select no-ts"
+        self.fields["prepared_for"].widget.attrs.update({"class": "form-control", "placeholder": "Optional, printed under the title"})
         self.fields["path"].choices = list(path_choices)
         count = path_count if path_count is not None else len(path_choices)
         if path_label:
@@ -56,6 +69,17 @@ class PrintOptionsForm(forms.Form):
             # shown under the object picker, outside the options form, but submitted with it
             self.fields["path"].widget.attrs["form"] = "options-form"
         self.fields["profile"].choices = [("", "All facts (no profile)")] + list(profile_choices)
+        self.fields["scope"].choices = [("", "Whole path")]
+
+    def set_scopes(self, scopes):
+        """Offer the scopes the trace passes through (scope.scopes_of), grouped by kind."""
+        groups = []
+        for kind, title in KINDS:
+            items = [(s["value"], s["label"].split(": ", 1)[1]) for s in scopes if s["kind"] == kind]
+            if items:
+                groups.append((title, items))
+        self.fields["scope"].choices = [("", "Whole path")] + groups
+        self.fields["scope"].widget.attrs["form"] = "options-form"        # the form is the print bar at the top
 
 
 # -- print profiles ------------------------------------------------------------------

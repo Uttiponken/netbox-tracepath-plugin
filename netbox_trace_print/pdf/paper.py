@@ -14,6 +14,15 @@ PAPER_MM = {
 
 ORIENTATIONS = ("landscape", "portrait")
 
+# The paper choice also says how to print: "A4" is colour, "A4:bw" black and white (grey tones).
+CHOICES = [(value, f"{paper} ({label})") for paper in PAPER_MM for value, label in ((paper, "Color"), (f"{paper}:bw", "B/W"))]
+
+
+def parse_choice(value):
+    """'A4:bw' -> ('A4', False): the paper size and whether the printout is in colour."""
+    paper, _sep, mode = str(value).partition(":")
+    return paper, mode != "bw"
+
 
 def page_size(paper="A4", orientation="landscape"):
     """(width, height) in points for a named paper and orientation."""
