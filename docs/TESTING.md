@@ -13,14 +13,14 @@ They run in a throwaway NetBox container (default image `netbox:latest-plugins-p
 
 The development NetBox is the `netbox-docker` deployment next to this repository:
 
-- `Dockerfile-Plugins` installs the plugin from the named build context `traceprint` (this checkout), and
-  `configuration/plugins.py` lists `netbox_trace_print`.
+- `Dockerfile-Plugins` installs the plugin from the named build context `tracepath` (this checkout), and
+  `configuration/plugins.py` lists `netbox_tracepath_plugin`.
 - `docker-compose.override.yml` (not committed) supplies the build context and bind-mounts this checkout
-  into the `netbox` and `netbox-worker` containers at `/opt/netbox/custom-plugins/netbox-trace-print`, so
+  into the `netbox` and `netbox-worker` containers at `/opt/netbox/custom-plugins/netbox-tracepath-plugin`, so
   edits show up without a rebuild.
 - After a **Python or template change**, restart so the web process reloads it:
   `docker compose ... restart netbox netbox-worker`. After adding a **migration**, run
-  `manage.py migrate netbox_trace_print` first. `makemigrations` only works in developer mode
+  `manage.py migrate netbox_tracepath_plugin` first. `makemigrations` only works in developer mode
   (`-e DEVELOPER=True`).
 
 ## The sample data
@@ -39,7 +39,7 @@ They run inside the `netbox` container, against that data:
 
 ```bash
 docker compose ... exec netbox sh -c "cd /opt/netbox/netbox && python manage.py shell -c \
-  \"exec(open('/opt/netbox/custom-plugins/netbox-trace-print/tests/live_smoke.py').read())\""
+  \"exec(open('/opt/netbox/custom-plugins/netbox-tracepath-plugin/tests/live_smoke.py').read())\""
 ```
 
 | Script | What it does |

@@ -1,9 +1,9 @@
 import unittest
 
-from netbox_trace_print.fields import ALL_KEYS, GROUPS, LABELS, PROFILES, group_of
-from netbox_trace_print.layout import LayoutSpec, render
-from netbox_trace_print.model import Block, Cable, Field, Link, PortRow, TraceDoc
-from netbox_trace_print.selection import apply_selection
+from netbox_tracepath_plugin.fields import ALL_KEYS, GROUPS, LABELS, PROFILES, group_of
+from netbox_tracepath_plugin.layout import LayoutSpec, render
+from netbox_tracepath_plugin.model import Block, Cable, Field, Link, PortRow, TraceDoc
+from netbox_tracepath_plugin.selection import apply_selection
 
 
 def doc():
@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
 class PluginGroupTests(unittest.TestCase):
     def test_plugin_groups_are_only_added_when_asked_for(self):
-        from netbox_trace_print.fields import GROUPS as CORE, PLUGIN_GROUPS, PLUGIN_KEYS, groups
+        from netbox_tracepath_plugin.fields import GROUPS as CORE, PLUGIN_GROUPS, PLUGIN_KEYS, groups
         self.assertEqual(groups(), CORE)
         self.assertEqual([g[0] for g in groups(("fms", "wdm"))][-2:], ["fms", "wdm"])
         self.assertEqual(groups(("nope",)), CORE)
@@ -147,10 +147,10 @@ class PluginGroupTests(unittest.TestCase):
 
     def test_the_keys_the_migrations_add_all_exist_in_the_catalogue(self):
         import importlib.util
-        from netbox_trace_print.fields import PLUGIN_KEYS
+        from netbox_tracepath_plugin.fields import PLUGIN_KEYS
         added = set()
         for number, file in (("m3", "0003_plugin_facts_in_profiles"), ("m4", "0004_strand_and_circuit_facts")):
-            spec = importlib.util.spec_from_file_location(number, f"netbox_trace_print/migrations/{file}.py")
+            spec = importlib.util.spec_from_file_location(number, f"netbox_tracepath_plugin/migrations/{file}.py")
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             for name, keys in module.ADD.items():
@@ -162,7 +162,7 @@ class PluginGroupTests(unittest.TestCase):
 
 class FiberColourTests(unittest.TestCase):
     def test_strand_colours_get_their_fiber_colour_names(self):
-        from netbox_trace_print.integrations.fms import colour_name
+        from netbox_tracepath_plugin.integrations.fms import colour_name
         din = {"ff0000": "red", "00ff00": "green", "0000ff": "blue", "ffff00": "yellow", "ffffff": "white",
                "708090": "grey", "8b4513": "brown", "ee82ee": "violet", "00ffff": "turquoise", "000000": "black",
                "ff8000": "orange", "ff69b4": "pink"}
@@ -175,7 +175,7 @@ class FiberColourTests(unittest.TestCase):
 
     def test_strands_are_listed_with_tube_fiber_and_colour(self):
         from types import SimpleNamespace as S
-        from netbox_trace_print.integrations.fms import strand_text
+        from netbox_tracepath_plugin.integrations.fms import strand_text
         self.assertEqual(strand_text([S(name="Tube 1-F3", color="0000ff"), S(name="Tube 1-F4", color="ffff00")]),
                          "Tube 1-F3 (blue), Tube 1-F4 (yellow)")
         self.assertEqual(strand_text([S(name="Tube 2-F1", color="")]), "Tube 2-F1")

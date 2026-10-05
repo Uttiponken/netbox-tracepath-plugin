@@ -13,7 +13,7 @@ import logging
 
 from . import fms, wdm
 
-log = logging.getLogger("netbox_trace_print")
+log = logging.getLogger("netbox_tracepath_plugin")
 
 MODULES = {"fms": fms, "wdm": wdm}
 DISABLED = set()          # names switched off (tests use this to prove the plugin works without them)

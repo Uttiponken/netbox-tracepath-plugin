@@ -115,7 +115,7 @@ class Canvas:
 
 
 class Document:
-    def __init__(self, title="", author="", subject="", creator="netbox-trace-print", created=None):
+    def __init__(self, title="", author="", subject="", creator="netbox-tracepath-plugin", created=None):
         self.title, self.author, self.subject, self.creator = title, author, subject, creator
         self.created = created or datetime.datetime.now(datetime.timezone.utc)
         self.pages = []

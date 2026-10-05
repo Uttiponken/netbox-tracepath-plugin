@@ -1,7 +1,7 @@
 """Writes out/utf8-demo.pdf: a UTF-8 and font smoke page. Run: python -m tests.demo_utf8"""
 
-from netbox_trace_print.pdf.paper import MM, page_size
-from netbox_trace_print.pdf.writer import Document
+from netbox_tracepath_plugin.pdf.paper import MM, page_size
+from netbox_tracepath_plugin.pdf.writer import Document
 
 SAMPLES = [
     "Swedish: Räksmörgås, Örebro, Västerås, Hässleholm, Trollhättan, Åland, Malmö",
@@ -16,7 +16,7 @@ SAMPLES = [
 
 def build():
     w, h = page_size("A4", "landscape")
-    doc = Document(title="UTF-8 test — Räksmörgås", author="netbox-trace-print")
+    doc = Document(title="UTF-8 test — Räksmörgås", author="netbox-tracepath-plugin")
     page = doc.add_page(w, h)
     m = 15 * MM
     page.rect(m, m, w - 2 * m, h - 2 * m, stroke=0, width=0.75)

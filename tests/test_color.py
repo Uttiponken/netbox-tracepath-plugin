@@ -2,9 +2,9 @@ import re
 import unittest
 import zlib
 
-from netbox_trace_print.layout import Engine, HEADER_FILL, LayoutSpec, SOFT, WHITE_BELOW, WHITE_BELOW_BW, _luminance, ink_for, render
-from netbox_trace_print.pdf.paper import CHOICES, PAPER_MM, parse_choice
-from netbox_trace_print.selection import apply_selection
+from netbox_tracepath_plugin.layout import Engine, HEADER_FILL, LayoutSpec, SOFT, WHITE_BELOW, WHITE_BELOW_BW, _luminance, ink_for, render
+from netbox_tracepath_plugin.pdf.paper import CHOICES, PAPER_MM, parse_choice
+from netbox_tracepath_plugin.selection import apply_selection
 from tests import sample
 
 

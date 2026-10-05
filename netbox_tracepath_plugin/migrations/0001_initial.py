@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
                 ('key', models.CharField(max_length=64)),
-                ('profile', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='field_rows', to='netbox_trace_print.printprofile')),
+                ('profile', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='field_rows', to='netbox_tracepath_plugin.printprofile')),
             ],
             options={
                 'ordering': ('key',),

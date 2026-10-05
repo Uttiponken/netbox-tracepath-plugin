@@ -20,7 +20,7 @@ class PrintProfile(ChangeLoggedModel):
         return self.name
 
     def get_absolute_url(self):
-        return reverse("plugins:netbox_trace_print:printprofile", args=[self.pk])
+        return reverse("plugins:netbox_tracepath_plugin:printprofile", args=[self.pk])
 
     @property
     def keys(self):
@@ -41,6 +41,7 @@ class PrintProfileField(models.Model):
 
     class Meta:
         ordering = ("key",)
+        # The constraint keeps the name from the plugin's earlier name (netbox-trace-print): renaming it would need a migration.
         constraints = [models.UniqueConstraint(fields=("profile", "key"), name="traceprint_profile_key_unique")]
 
     def __str__(self):

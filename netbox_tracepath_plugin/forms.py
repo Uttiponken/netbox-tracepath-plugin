@@ -24,7 +24,7 @@ def pick_form(kind):
     if kind in OPTION_KINDS:
         # our own options: 'equipment : port' (and cables with their ends), searchable by either part
         widget = APISelect()
-        widget.attrs["data-url"] = reverse("plugins:netbox_trace_print:options", kwargs={"kind": kind})
+        widget.attrs["data-url"] = reverse("plugins:netbox_tracepath_plugin:options", kwargs={"kind": kind})
         label_from = cable_label if kind == "cable" else port_label
     field = DynamicModelChoiceField(
         queryset=model.objects.filter(cable__isnull=False) if cabled else model.objects.all(),

@@ -67,7 +67,7 @@ class IndexView(KindPermissionMixin, View):
         kind = request.GET.get("kind")
         profiles = PrintProfile.objects.restrict(request.user, "view")
         form = PrintOptionsForm(request.GET or None, profile_choices=[(str(p.pk), p.name) for p in profiles])
-        return render(request, "netbox_trace_print/print.html", {
+        return render(request, "netbox_tracepath_plugin/print.html", {
             "object": None, "pickers": _pickers(kind if kind in kinds() else None), "form": form})
 
 
@@ -90,11 +90,11 @@ class PickView(KindPermissionMixin, View):
         form = pick_form(kind)(request.GET or None)
         carried = _carried(request)
         if form.is_valid():
-            url = reverse("plugins:netbox_trace_print:print", kwargs={"kind": kind, "pk": form.cleaned_data["object"].pk})
+            url = reverse("plugins:netbox_tracepath_plugin:print", kwargs={"kind": kind, "pk": form.cleaned_data["object"].pk})
             return redirect(url + (f"?{carried}" if carried else ""))
         if request.GET.get("object"):
             messages.error(request, "That object has no cable, so there is no trace to print.")
-        return redirect(reverse("plugins:netbox_trace_print:index") + f"?kind={kind}" + (f"&{carried}" if carried else ""))
+        return redirect(reverse("plugins:netbox_tracepath_plugin:index") + f"?kind={kind}" + (f"&{carried}" if carried else ""))
 
 
 def _object(request, kind, pk):
@@ -265,9 +265,9 @@ class PrintView(KindPermissionMixin, View):
     def get(self, request, kind, pk):
         prep = _prepare(request, kind, pk)
         result = prep["result"]
-        pdf_url = reverse("plugins:netbox_trace_print:pdf", kwargs={"kind": kind, "pk": pk}) + "?" + _pdf_query(prep)
+        pdf_url = reverse("plugins:netbox_tracepath_plugin:pdf", kwargs={"kind": kind, "pk": pk}) + "?" + _pdf_query(prep)
         groups = [{"label": label, "items": [(k, l, k in prep["keys"]) for k, l in items]} for _g, label, items in catalogue.groups()]
-        return render(request, "netbox_trace_print/print.html", {
+        return render(request, "netbox_tracepath_plugin/print.html", {
             "object": prep["obj"], "kind": kind, "label": kinds()[kind][2], "form": prep["form"], "path": prep["path"],
             "report": result["report"] if result else None, "doc": result["doc"] if result else None,
             "pdf_url": pdf_url, "groups": groups, "layout_name": prep["layout_name"],

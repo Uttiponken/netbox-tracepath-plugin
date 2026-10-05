@@ -410,7 +410,7 @@ class Collector:
 
         now = timezone.localtime(timezone.now())
         footer = (f"Generated {now:%Y-%m-%d %H:%M} by {self.user.get_username()} · NetBox "
-                  f"{settings.RELEASE.full_version} · netbox-trace-print {__version__}")
+                  f"{settings.RELEASE.full_version} · netbox-tracepath-plugin {__version__}")
         return TraceDoc(title=title, summary=summary, blocks=blocks, links=links, notes=notes, footer=footer,
                         summary_items=items, footer_items=[("doc.generated", footer)])
 

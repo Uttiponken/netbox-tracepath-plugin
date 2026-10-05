@@ -436,7 +436,7 @@ class Engine:
                 f"A row of blocks is taller than a {self.spec.paper} {self.spec.orientation} page at "
                 f"{self.spec.min_size:g} pt. Choose larger paper or fewer fields.")
         report.page_segments = [page["segment"] for page in plan["pages_layout"]]
-        pdf = Document(title=doc.title, author="netbox-trace-print")
+        pdf = Document(title=doc.title, author="netbox-tracepath-plugin")
         for p, page in enumerate(plan["pages_layout"]):
             pt = _Painter(pdf.add_page(self.page_w, self.page_h), p, m, report)
             self._page_chrome(pt, plan, p)

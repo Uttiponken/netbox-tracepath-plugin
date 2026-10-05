@@ -1,7 +1,7 @@
 import unittest
 
-from netbox_trace_print.layout import LayoutSpec, render
-from netbox_trace_print.pdf.paper import MM, PAPER_MM, page_size
+from netbox_tracepath_plugin.layout import LayoutSpec, render
+from netbox_tracepath_plugin.pdf.paper import MM, PAPER_MM, page_size
 from tests import sample
 
 TRACES = {

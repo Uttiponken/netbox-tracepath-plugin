@@ -1,4 +1,4 @@
-# netbox-trace-print
+# netbox-tracepath-plugin
 
 A NetBox plugin that turns a cable trace into a printable **PDF** for technicians
 and field engineers. Each device on the path is a block, laid out in a grid that
@@ -10,7 +10,7 @@ continues E–F–G on the next.
 *Example: a colocation tenant's path from its switch to Nordfiber's core switch, A4 landscape, printed with the
 Field technician profile (`samples/0.5.0/field-technician-nordfiber-colo-tenant-a4-landscape.pdf`).*
 
-**Status: early development (0.6.2).** Start from a cable, interface, front port or circuit termination
+**Status: early development (0.7.0).** Start from a cable, interface, front port or circuit termination
 (and, with netbox-wdm / netbox-fms, a WDM circuit, fiber cable or fiber circuit), choose which facts to print
 (by recipient, using print profiles), extend the trace at either end, see it as a PDF in the page and download
 it, optionally limited to one site, location or rack. Colours by site/rack are next. See `docs/ROADMAP.md` and
@@ -18,7 +18,7 @@ it, optionally limited to one site, location or rack. Colours by site/rack are n
 
 ## Use
 
-**Plugins → Trace Print → Print cable trace**. One page does it all: the PDF preview is on the left (empty until you
+**Plugins → Tracepath → Print cable trace**. One page does it all: the PDF preview is on the left (empty until you
 have chosen something) and the menu is on the right. Buttons for the kinds of starting point (Cable,
 Interface, Front port, Circuit termination, and with netbox-wdm / netbox-fms also WDM circuit, Fiber cable and Fiber circuit) sit at the top; picking one opens a dropdown
 below them on the same page. Only objects that have a cable are listed, since the others have no trace. Ports are listed
@@ -56,8 +56,8 @@ are always printed, and a fact you hide is hidden everywhere (also on the marker
 layout was used ("Layout: Field technician", "(adjusted)" if you changed it), and an optional
 "Prepared for" line goes under the title.
 
-**Managing profiles.** The *Manage profiles* button (or Plugins → Trace Print → Print profiles): add, edit and delete profiles, with
-the usual NetBox change log and permissions (`netbox_trace_print.view/add/change/delete_printprofile`).
+**Managing profiles.** The *Manage profiles* button (or Plugins → Tracepath → Print profiles): add, edit and delete profiles, with
+the usual NetBox change log and permissions (`netbox_tracepath_plugin.view/add/change/delete_printprofile`).
 Without view permission on profiles you can still tick facts by hand.
 
 You need the stock trace permission (view cables) and view permission on the object type. Objects
@@ -82,7 +82,7 @@ the information always fits the chosen paper.
 - **Generic fields only in the core.** Standard NetBox data (cables, ports, devices, racks,
   locations, sites, tenants, circuits). No custom fields. Facts from other plugins (netbox-fms,
   netbox-wdm) are optional extras, printed only when that plugin is installed (see *Other plugins*).
-- **Own tables only.** Print profiles live in two tables of the plugin (`netbox_trace_print_printprofile`
+- **Own tables only.** Print profiles live in two tables of the plugin (`netbox_tracepath_plugin_printprofile`
   and `..._printprofilefield`). They hold no reference to any NetBox object and the migrations depend on
   nothing in NetBox. Installing runs them like any plugin (`manage.py migrate`, done by NetBox's
   upgrade script and by netbox-docker on start).
@@ -186,13 +186,13 @@ NetBox 4.6.x.
 ## Install
 
 ```bash
-pip install netbox-trace-print        # or: pip install -e . from a checkout
+pip install netbox-tracepath-plugin        # or: pip install -e . from a checkout
 ```
 
 Add to `PLUGINS` in NetBox's `configuration.py` (no `PLUGINS_CONFIG` needed):
 
 ```python
-PLUGINS = ["netbox_trace_print"]
+PLUGINS = ["netbox_tracepath_plugin"]
 ```
 
 ## Authors
@@ -205,6 +205,36 @@ line, so the model behind any change can be read from the history and compared w
 The sample printouts come from the [netbox-sampledata](https://github.com/Uttiponken/netbox-sampledata)
 dataset: fictional companies on real hardware (see "Authors" in its README).
 
+## Upgrading from netbox-trace-print (0.6.2 and earlier)
+
+The plugin was renamed in 0.7.0: `netbox-trace-print` is now **`netbox-tracepath-plugin`**, the Python module is
+`netbox_tracepath_plugin`, the menu says *Tracepath* and the pages live under `/plugins/tracepath/`. GitHub
+redirects the old repository address. Because NetBox requires the app label to equal the module name, the plugin's
+database tables, content types and migration history carry the module name, so an installation that already ran
+the old name has to rename them **once, before the new version starts for the first time** (it keeps the print
+profiles, their change log and the permissions assigned to them). A new installation needs nothing.
+
+1. Back up the database (`docs/OFFLINE-REPLACE-INSTALL.md` in netbox-docker, step D2, shows the command).
+2. Stop NetBox: `docker compose stop netbox netbox-worker` (the database keeps running).
+3. Rename, in one transaction (run it with `psql` in the database container):
+
+```sql
+BEGIN;
+ALTER TABLE netbox_trace_print_printprofile RENAME TO netbox_tracepath_plugin_printprofile;
+ALTER TABLE netbox_trace_print_printprofilefield RENAME TO netbox_tracepath_plugin_printprofilefield;
+UPDATE django_migrations SET app = 'netbox_tracepath_plugin' WHERE app = 'netbox_trace_print';
+UPDATE django_content_type SET app_label = 'netbox_tracepath_plugin' WHERE app_label = 'netbox_trace_print';
+COMMIT;
+```
+
+4. In `PLUGINS` (NetBox's `plugins.py`) replace `netbox_trace_print` with `netbox_tracepath_plugin`, build the image
+   with the new plugin and start NetBox. `manage.py showmigrations netbox_tracepath_plugin` shows all four
+   migrations applied and nothing is migrated.
+
+If the new version was started before the rename, NetBox has created empty tables under the new name: drop those
+two empty tables (and delete the new `django_content_type` rows with `app_label = 'netbox_tracepath_plugin'`)
+before running the statements above.
+
 ## License
 
 Apache-2.0, the same as NetBox.
@@ -212,6 +242,6 @@ Apache-2.0, the same as NetBox.
 ## Third-party
 
 The PDF text uses the DejaVu Sans and DejaVu Sans Condensed fonts (regular and bold),
-bundled in `netbox_trace_print/fonts/` under the Bitstream Vera / DejaVu licence
+bundled in `netbox_tracepath_plugin/fonts/` under the Bitstream Vera / DejaVu licence
 (`LICENSE-DejaVu.txt`). They cover Latin, Greek and Cyrillic; other scripts such as
 CJK are not covered.

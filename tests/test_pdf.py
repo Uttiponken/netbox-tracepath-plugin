@@ -2,10 +2,10 @@ import re
 import unittest
 import zlib
 
-from netbox_trace_print.pdf.fonts import FONT_FILES, load_font
-from netbox_trace_print.pdf.paper import PAPER_MM, MM, page_size
-from netbox_trace_print.pdf.ttf import TTFont
-from netbox_trace_print.pdf.writer import Document
+from netbox_tracepath_plugin.pdf.fonts import FONT_FILES, load_font
+from netbox_tracepath_plugin.pdf.paper import PAPER_MM, MM, page_size
+from netbox_tracepath_plugin.pdf.ttf import TTFont
+from netbox_tracepath_plugin.pdf.writer import Document
 
 
 class FontTests(unittest.TestCase):

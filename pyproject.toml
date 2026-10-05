@@ -3,8 +3,8 @@ requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "netbox-trace-print"
-version = "0.6.2"
+name = "netbox-tracepath-plugin"
+version = "0.7.0"
 description = "Printable PDF cable traces for technicians and field engineers, for NetBox."
 readme = "README.md"
 license = "Apache-2.0"
@@ -24,7 +24,7 @@ dependencies = []
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["netbox_trace_print*"]
+include = ["netbox_tracepath_plugin*"]
 
 [tool.setuptools.package-data]
-netbox_trace_print = ["templates/**", "fonts/*"]
+netbox_tracepath_plugin = ["templates/**", "fonts/*"]

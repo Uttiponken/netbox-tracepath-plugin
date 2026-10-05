@@ -1,26 +1,26 @@
 from netbox.plugins import PluginMenu, PluginMenuButton, PluginMenuItem
 
 menu = PluginMenu(
-    label="Trace Print",
+    label="Tracepath",
     groups=(
         ("Printing", (
             PluginMenuItem(
-                link="plugins:netbox_trace_print:index",
+                link="plugins:netbox_tracepath_plugin:index",
                 link_text="Print cable trace",
                 permissions=["dcim.view_cable"],
             ),
         )),
         ("Configuration", (
             PluginMenuItem(
-                link="plugins:netbox_trace_print:printprofile_list",
+                link="plugins:netbox_tracepath_plugin:printprofile_list",
                 link_text="Print profiles",
-                permissions=["netbox_trace_print.view_printprofile"],
+                permissions=["netbox_tracepath_plugin.view_printprofile"],
                 buttons=(
                     PluginMenuButton(
-                        link="plugins:netbox_trace_print:printprofile_add",
+                        link="plugins:netbox_tracepath_plugin:printprofile_add",
                         title="Add",
                         icon_class="mdi mdi-plus-thick",
-                        permissions=["netbox_trace_print.add_printprofile"],
+                        permissions=["netbox_tracepath_plugin.add_printprofile"],
                     ),
                 ),
             ),

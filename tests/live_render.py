@@ -1,7 +1,7 @@
 """
 Renders real traces from the running NetBox into out/live-*.pdf. Run inside the NetBox container:
 
-  manage.py shell -c "exec(open('/opt/netbox/custom-plugins/netbox-trace-print/tests/live_render.py').read())"
+  manage.py shell -c "exec(open('/opt/netbox/custom-plugins/netbox-tracepath-plugin/tests/live_render.py').read())"
 """
 import os
 
@@ -9,10 +9,10 @@ from django.contrib.auth import get_user_model
 
 from circuits.models import CircuitTermination
 from dcim.models import FrontPort, Interface, RearPort
-from netbox_trace_print.collect import Collector, describe_path, paths_through
-from netbox_trace_print.layout import LayoutSpec, render
+from netbox_tracepath_plugin.collect import Collector, describe_path, paths_through
+from netbox_tracepath_plugin.layout import LayoutSpec, render
 
-OUT = "/opt/netbox/custom-plugins/netbox-trace-print/out"
+OUT = "/opt/netbox/custom-plugins/netbox-tracepath-plugin/out"
 os.makedirs(OUT, exist_ok=True)
 user = get_user_model().objects.get(username="demo-loader")
 

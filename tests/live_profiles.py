@@ -1,7 +1,7 @@
 """
 One real trace printed with every print profile, into samples/<version>/. Run inside the NetBox container:
 
-  manage.py shell -c "exec(open('/opt/netbox/custom-plugins/netbox-trace-print/tests/live_profiles.py').read())"
+  manage.py shell -c "exec(open('/opt/netbox/custom-plugins/netbox-tracepath-plugin/tests/live_profiles.py').read())"
 """
 import os
 
@@ -9,13 +9,13 @@ from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 
 from dcim.models import Interface
-from netbox_trace_print import __version__
-from netbox_trace_print.collect import Collector, paths_through
-from netbox_trace_print.layout import LayoutSpec, render
-from netbox_trace_print.models import PrintProfile
-from netbox_trace_print.selection import apply_selection
+from netbox_tracepath_plugin import __version__
+from netbox_tracepath_plugin.collect import Collector, paths_through
+from netbox_tracepath_plugin.layout import LayoutSpec, render
+from netbox_tracepath_plugin.models import PrintProfile
+from netbox_tracepath_plugin.selection import apply_selection
 
-OUT = f"/opt/netbox/custom-plugins/netbox-trace-print/samples/{__version__}"
+OUT = f"/opt/netbox/custom-plugins/netbox-tracepath-plugin/samples/{__version__}"
 os.makedirs(OUT, exist_ok=True)
 user = get_user_model().objects.get(username="demo-loader")
 
@@ -38,7 +38,7 @@ for trace, get in TRACES.items():
 
 
 # A trace extended at the end, step by step, from one Baltic Retail server to the other.
-from netbox_trace_print.extend import Chain
+from netbox_tracepath_plugin.extend import Chain
 
 pid = lambda dev, name: Interface.objects.get(device__name=dev, name=name).pk
 base = paths_through(Interface.objects.get(device__name="baltic-retail-sto-srv-01", name="Gig-E 1"))[0]

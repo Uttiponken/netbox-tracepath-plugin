@@ -36,8 +36,8 @@ class PrintTraceButton(PluginTemplateExtension):
         slug = next((s for s, (app, model, _n) in kinds().items() if (app, model) == (meta.app_label, meta.model_name)), None)
         if slug is None or (slug in NEEDS_CABLE and getattr(obj, "cable", None) is None):
             return ""
-        return self.render("netbox_trace_print/inc/print_button.html", {
-            "print_url": reverse("plugins:netbox_trace_print:print", kwargs={"kind": slug, "pk": obj.pk})})
+        return self.render("netbox_tracepath_plugin/inc/print_button.html", {
+            "print_url": reverse("plugins:netbox_tracepath_plugin:print", kwargs={"kind": slug, "pk": obj.pk})})
 
 
 template_extensions = [PrintTraceButton]

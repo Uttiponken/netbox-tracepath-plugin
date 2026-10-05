@@ -26,7 +26,7 @@ TABLES = (
     (CircuitTerminationTable, "circuit-termination", True),
 )
 
-CODE = """{% if perms.dcim.view_cable %}{% if CABLE_CHECK %}<a href="{% url 'plugins:netbox_trace_print:print' kind='KIND' pk=record.pk %}" class="btn btn-sm btn-primary" title="Print trace as PDF"><i class="mdi mdi-printer"></i></a>{% endif %}{% endif %}"""
+CODE = """{% if perms.dcim.view_cable %}{% if CABLE_CHECK %}<a href="{% url 'plugins:netbox_tracepath_plugin:print' kind='KIND' pk=record.pk %}" class="btn btn-sm btn-primary" title="Print trace as PDF"><i class="mdi mdi-printer"></i></a>{% endif %}{% endif %}"""
 
 
 def _column(kind, needs_cable):

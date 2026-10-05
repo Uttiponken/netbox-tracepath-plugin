@@ -9,8 +9,8 @@ layout: every field of every block and cable) so they can be discussed by name.
 
 import os
 
-from netbox_trace_print import __version__
-from netbox_trace_print.layout import LayoutSpec, render
+from netbox_tracepath_plugin import __version__
+from netbox_tracepath_plugin.layout import LayoutSpec, render
 from tests.sample import long_trace
 
 LAYOUT = "full-information"

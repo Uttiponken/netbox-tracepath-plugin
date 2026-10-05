@@ -1,15 +1,15 @@
 from netbox.plugins import PluginConfig
 
-__version__ = "0.6.2"
+__version__ = "0.7.0"
 
 
-class TraceprintConfig(PluginConfig):
-    name = "netbox_trace_print"
-    verbose_name = "Trace Print"
+class TracepathConfig(PluginConfig):
+    name = "netbox_tracepath_plugin"
+    verbose_name = "Tracepath"
     description = "Printable PDF cable traces for technicians and field engineers."
     author = "JP, co-authored with Claude Sonnet 5.5"
     version = __version__
-    base_url = "trace-print"
+    base_url = "tracepath"
     min_version = "4.6.0"
     max_version = "4.6.99"
     # No settings yet. Every option (paper, orientation, fields) is chosen when printing.
@@ -21,4 +21,4 @@ class TraceprintConfig(PluginConfig):
         register()
 
 
-config = TraceprintConfig
+config = TracepathConfig

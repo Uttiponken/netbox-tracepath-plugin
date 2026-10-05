@@ -33,7 +33,7 @@
               <button type="submit" name="apply" value="1" class="btn btn-outline-primary text-nowrap flex-shrink-0"{% if not object %} disabled{% endif %}>Apply profile</button>
             </div>
           </div>
-          <a class="btn btn-outline-secondary text-nowrap flex-shrink-0" href="{% url 'plugins:netbox_trace_print:printprofile_list' %}">
+          <a class="btn btn-outline-secondary text-nowrap flex-shrink-0" href="{% url 'plugins:netbox_tracepath_plugin:printprofile_list' %}">
             <i class="mdi mdi-cog me-1"></i> Manage profiles
           </a>
           <button type="button" class="btn btn-outline-secondary text-nowrap flex-shrink-0" data-bs-toggle="collapse" data-bs-target="#facts-panel"
@@ -125,7 +125,7 @@
         <h2 class="card-header">What to trace</h2>
         <div class="card-body">
           {% if object %}<p class="mb-2"><strong>{{ label }} {{ object }}</strong></p>{% endif %}
-          {% include 'netbox_trace_print/_picker.html' %}
+          {% include 'netbox_tracepath_plugin/_picker.html' %}
           {% if object and not form.path.is_hidden %}
             <hr>
             {% render_field form.path %}

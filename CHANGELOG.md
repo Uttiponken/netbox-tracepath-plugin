@@ -2,6 +2,15 @@
 
 Releases are tagged `vX.Y.Z`; sample PDFs for each are in `samples/X.Y.Z/`.
 
+## 0.7.0
+
+- **Renamed to netbox-tracepath-plugin.** The GitHub repository, the pip package, the Python module
+  `netbox_tracepath_plugin` (which is also the Django app label: tables `netbox_tracepath_plugin_*`, permissions
+  `netbox_tracepath_plugin.*`), the URL path `/plugins/tracepath/`, the menu label *Tracepath* and the footer text of
+  the printouts. GitHub redirects the old repository address. Entries below this one use the old name.
+- An existing installation renames its database tables once (README, "Upgrading from netbox-trace-print"); a new
+  installation needs nothing. No change in behaviour or printouts.
+
 ## 0.6.2
 
 - **Equipment colour.** The header of each block is filled with the colour NetBox gives the equipment (its device

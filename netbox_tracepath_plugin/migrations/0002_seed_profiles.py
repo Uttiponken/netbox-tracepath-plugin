@@ -48,8 +48,8 @@ PROFILES = [('Full information', 'Everything.',
 
 
 def seed(apps, schema_editor):
-    Profile = apps.get_model("netbox_trace_print", "PrintProfile")
-    Field = apps.get_model("netbox_trace_print", "PrintProfileField")
+    Profile = apps.get_model("netbox_tracepath_plugin", "PrintProfile")
+    Field = apps.get_model("netbox_tracepath_plugin", "PrintProfileField")
     if Profile.objects.exists():          # someone already has profiles: leave them alone
         return
     for name, description, keys in PROFILES:
@@ -59,6 +59,6 @@ def seed(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
-    dependencies = [("netbox_trace_print", "0001_initial")]
+    dependencies = [("netbox_tracepath_plugin", "0001_initial")]
 
     operations = [migrations.RunPython(seed, migrations.RunPython.noop)]

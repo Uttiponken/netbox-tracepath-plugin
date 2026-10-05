@@ -19,6 +19,7 @@ One directory per plugin release, so a layout can be discussed by name and versi
 | 0.6.0 | Scoped prints (`*-scope-*`): the Stockholm–Helsinki link limited to the MeetMe rack, to Stockholm and to Helsinki, and the Baltic Retail server-to-server chain limited to Malmö and to the Stockholm MeetMe room |
 | 0.6.1 | No new samples |
 | 0.6.2 | Block headers in the colour of the equipment's role (`*-colo-tenant-*`, `*-wdm-circuit-*`) |
+| 0.7.0 | No new samples (the footer of a printout now names netbox-tracepath-plugin) |
 
 Regenerate with `python -m tests.demo_layout` (inside a NetBox container, see `run-tests.sh`);
 the real-data ones with `tests/live_render.py`.

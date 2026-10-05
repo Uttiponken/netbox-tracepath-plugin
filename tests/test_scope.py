@@ -1,11 +1,11 @@
 import copy
 import unittest
 
-from netbox_trace_print.fields import ALL_KEYS
-from netbox_trace_print.layout import LayoutSpec, render
-from netbox_trace_print.pdf.paper import MM, page_size
-from netbox_trace_print.scope import apply_scope, label_of, parse, scopes_of
-from netbox_trace_print.selection import apply_selection
+from netbox_tracepath_plugin.fields import ALL_KEYS
+from netbox_tracepath_plugin.layout import LayoutSpec, render
+from netbox_tracepath_plugin.pdf.paper import MM, page_size
+from netbox_tracepath_plugin.scope import apply_scope, label_of, parse, scopes_of
+from netbox_tracepath_plugin.selection import apply_selection
 from tests import sample
 
 EPS = 0.5

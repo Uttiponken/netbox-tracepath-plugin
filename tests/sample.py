@@ -1,6 +1,6 @@
 """Synthetic but realistic traces for exercising the layout engine."""
 
-from netbox_trace_print.model import Block, Cable, Field, Link, PortRow, TraceDoc
+from netbox_tracepath_plugin.model import Block, Cable, Field, Link, PortRow, TraceDoc
 
 YELLOW, GRAY, BLACK = "ffeb3b", "9e9e9e", "111111"
 
@@ -48,7 +48,7 @@ def long_trace(blocks=11):
                  f"{len(links)} cables · total length 126 m+ · path complete"],
         blocks=blocks_, links=links,
         notes=["Path is incomplete beyond the last block: the far end is not connected."] if blocks == 7 else [],
-        footer="Generated 2026-10-02 by demo-loader · netbox-trace-print 0.1.0")
+        footer="Generated 2026-10-02 by demo-loader · netbox-tracepath-plugin 0.1.0")
 
 
 def tiny_trace():
