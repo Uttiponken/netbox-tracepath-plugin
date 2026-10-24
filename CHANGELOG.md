@@ -2,6 +2,15 @@
 
 Releases are tagged `vX.Y.Z`; sample PDFs for each are in `samples/X.Y.Z/`.
 
+## Unreleased
+
+- **The repository no longer depends on any sample data.** `tests/live_smoke.py` now seeds a small network of its
+  own, tests the pages against it and removes it again (also after a failure), so it runs on any NetBox that has
+  the plugin installed and needs no other plugin; on a NetBox without other plugins it takes seconds. The tests that
+  used one particular data set (the larger smoke test, the renders of real traces, profiles, scopes, FMS and WDM)
+  left this repository for the repository of that data set. The unit-test fixtures use neutral names and the
+  documentation no longer points at a data set. No change to the plugin itself.
+
 ## 0.7.0
 
 - **Renamed to netbox-tracepath-plugin.** The GitHub repository, the pip package, the Python module

@@ -1,9 +1,9 @@
-# Testing, and trying the plugin on the sample data
+# Testing
 
 ## Unit tests (no NetBox data needed)
 
 ```bash
-./run-tests.sh                    # layout, PDF, selection, colours and migration keys
+./run-tests.sh                    # layout, PDF, selection, colours, scopes and migration keys
 ```
 
 They run in a throwaway NetBox container (default image `netbox:latest-plugins-postgis`, override with
@@ -11,43 +11,37 @@ They run in a throwaway NetBox container (default image `netbox:latest-plugins-p
 
 ## A local NetBox with the plugin
 
-The development NetBox is the `netbox-docker` deployment next to this repository:
+Any NetBox 4.6 that has the plugin installed will do, with or without other plugins. A development setup:
 
-- `Dockerfile-Plugins` installs the plugin from the named build context `tracepath` (this checkout), and
-  `configuration/plugins.py` lists `netbox_tracepath_plugin`.
-- `docker-compose.override.yml` (not committed) supplies the build context and bind-mounts this checkout
-  into the `netbox` and `netbox-worker` containers at `/opt/netbox/custom-plugins/netbox-tracepath-plugin`, so
-  edits show up without a rebuild.
-- After a **Python or template change**, restart so the web process reloads it:
-  `docker compose ... restart netbox netbox-worker`. After adding a **migration**, run
+- Install the plugin from this checkout (`pip install -e .`), or only put the folder on `PYTHONPATH`: the plugin
+  has no dependencies. List `netbox_tracepath_plugin` in `PLUGINS`.
+- With Docker, bind-mount this checkout into the `netbox` and `netbox-worker` containers so that edits show up
+  without a rebuild.
+- After a **Python or template change**, restart so the web process reloads it. After adding a **migration**, run
   `manage.py migrate netbox_tracepath_plugin` first. `makemigrations` only works in developer mode
   (`-e DEVELOPER=True`).
 
-## The sample data
+## The live smoke test
 
-The live tests need real data: the Nordfiber AB dataset in the `netbox-sampledata` repository.
-
-```bash
-cd ../netbox-sampledata
-tools/reset_netbox.sh             # DESTRUCTIVE: empty local NetBox, creates the demo-loader user and token
-./.venv/bin/python build.py       # builds all seven layers, then verify.py (a few minutes)
-```
-
-## Live tests
-
-They run inside the `netbox` container, against that data:
+It needs no data: it seeds three sites with a few switches, two patch panels joined by a trunk with three pairs in
+use, a circuit and some uncabled ports (all named `tp-seed-*`), tests every page and behaviour against them through
+Django's test client (pickers, trunk pairs, profiles, extending, scopes, permissions, the buttons and columns in
+NetBox's own pages), and removes everything again, also when a check fails. Pipe it into the Django shell inside the
+`netbox` container; nothing needs to be copied in:
 
 ```bash
-docker compose ... exec netbox sh -c "cd /opt/netbox/netbox && python manage.py shell -c \
-  \"exec(open('/opt/netbox/custom-plugins/netbox-tracepath-plugin/tests/live_smoke.py').read())\""
+docker compose ... exec -T netbox sh -c "cd /opt/netbox/netbox && python manage.py shell" < tests/live_smoke.py
 ```
 
-| Script | What it does |
-|---|---|
-| `tests/live_smoke.py` | Every page and behaviour through Django's test client: pickers, trunk pairs, profiles, extending, WDM and FMS, permissions. Creates a throw-away user and removes it. Ends with `ALL OK` or a list of failures. |
-| `tests/live_render.py` | Real traces from the data, rendered to PDF in `out/` (ignored by git). |
-| `tests/live_profiles.py` | One real trace printed with each print profile. |
-| `tests/live_wdm.py`, `tests/live_fms.py`, `tests/live_scope.py` | WDM circuits, fiber circuits and a trunk pair, and scoped prints, printed into `samples/<version>/`. |
+It ends with `ALL OK` or a list of failed checks. On a NetBox without other plugins it takes seconds; with
+netbox-wdm installed it takes minutes, because that plugin re-traces its wavelength paths on every cable save.
+Facts from netbox-fms and netbox-wdm are covered by the unit tests and by whoever runs the plugin on data that has
+them; the smoke test only checks that the plugin works with those integrations switched off.
+
+## More realistic data
+
+Anything with cabled equipment works. To look at the output on a larger network, load any data set you like and
+print from the pages; `python -m tests.demo_layout` renders the synthetic samples.
 
 ## Sample PDFs
 

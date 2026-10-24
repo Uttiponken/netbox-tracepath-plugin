@@ -43,7 +43,7 @@ def parse(value):
 
 
 def label_of(value):
-    """How a scope is named in the dropdown: 'Rack: Nordfiber Stockholm DC › Telecom Room › STO-TR-01'."""
+    """How a scope is named in the dropdown: 'Rack: Main Site › Telecom Room › DC1-TR-01'."""
     kind, names = parse(value)
     return f"{dict(KINDS)[kind]}: " + " › ".join(n for n in names if n) if kind else ""
 

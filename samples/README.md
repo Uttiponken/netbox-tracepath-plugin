@@ -5,7 +5,7 @@ One directory per plugin release, so a layout can be discussed by name and versi
 `samples/<version>/<layout>-<paper>-<orientation>.pdf`
 
 - **full-information**: every field of every block and cable. The first layout.
-- `full-information-nordfiber-*`: real traces from the Nordfiber sample dataset (netbox-sampledata).
+- `full-information-nordfiber-*`: real traces from a demo data set (the fictional carrier Nordfiber on real hardware).
 - The others are synthetic (`tests/sample.py`).
 
 | Version | What is new in the samples |
@@ -21,5 +21,5 @@ One directory per plugin release, so a layout can be discussed by name and versi
 | 0.6.2 | Block headers in the colour of the equipment's role (`*-colo-tenant-*`, `*-wdm-circuit-*`) |
 | 0.7.0 | No new samples (the footer of a printout now names netbox-tracepath-plugin) |
 
-Regenerate with `python -m tests.demo_layout` (inside a NetBox container, see `run-tests.sh`);
-the real-data ones with `tests/live_render.py`.
+Regenerate the synthetic ones with `python -m tests.demo_layout` (inside a NetBox container, see `run-tests.sh`).
+The real-trace ones were rendered from a demo data set that is not part of this repository, and are kept as they were.

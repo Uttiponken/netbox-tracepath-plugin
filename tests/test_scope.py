@@ -31,7 +31,7 @@ class ScopeFunctionTests(unittest.TestCase):
         found = scopes_of(sample.long_trace(11))                  # one site, one room, three racks
         self.assertEqual([s["kind"] for s in found], ["rack"] * 3)
         self.assertEqual([s["blocks"] for s in found], [4, 4, 3])
-        self.assertEqual(found[0]["label"], "Rack: Nordfiber Stockholm DC › Telecom Room › STO-TR-01")
+        self.assertEqual(found[0]["label"], "Rack: Fictional Northland DC › Telecom Room › DC1-TR-01")
 
     def test_sites_come_before_locations_before_racks_in_the_order_the_path_meets_them(self):
         found = scopes_of(trace("AABBAACCAAA"))
@@ -82,13 +82,13 @@ class ScopeFunctionTests(unittest.TestCase):
 
     def test_a_circuit_has_no_place_so_it_is_never_in_a_scope(self):
         doc = sample.hostile_trace()
-        out = apply_scope(doc, "site:Nordfiber Stockholm DC")
+        out = apply_scope(doc, "site:Fictional Northland DC")
         self.assertEqual([b.kind for b in out.blocks][-2:], ["device", "edge-out"])
-        self.assertEqual(out.blocks[-1].title, "Circuit NF-BRG-0001")
+        self.assertEqual(out.blocks[-1].title, "Circuit EX-CIR-0001")
         self.assertEqual(len(out.segments), 1)
 
     def test_a_scope_that_covers_everything_is_one_segment_without_markers(self):
-        out = apply_scope(sample.long_trace(11), "site:Nordfiber Stockholm DC")
+        out = apply_scope(sample.long_trace(11), "site:Fictional Northland DC")
         self.assertEqual([(s.first, s.last) for s in out.segments], [(0, 10)])
         self.assertFalse([b for b in out.blocks if b.kind.startswith("edge")])
 

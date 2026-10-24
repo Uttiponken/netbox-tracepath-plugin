@@ -76,7 +76,7 @@ class SelectionTests(unittest.TestCase):
 
     def test_where_a_block_is_follows_the_selection_so_chevron_markers_cannot_leak_it(self):
         d = doc()
-        d.blocks[0].site, d.blocks[0].location, d.blocks[0].rack = "Stockholm", "Colo Hall", "STO-CH-01"
+        d.blocks[0].site, d.blocks[0].location, d.blocks[0].rack = "Stockholm", "Colo Hall", "DC1-CH-01"
         out = apply_selection(d, {"device.site"}).blocks[0]
         self.assertEqual((out.site, out.location, out.rack), ("Stockholm", "", ""))
         out = apply_selection(d, set()).blocks[0]

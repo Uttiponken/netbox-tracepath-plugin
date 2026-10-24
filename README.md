@@ -7,8 +7,8 @@ continues E–F–G on the next.
 
 ![A one-page trace: a colo tenant's switch to the core switch through four patch panels](docs/images/example-colo-tenant.png)
 
-*Example: a colocation tenant's path from its switch to Nordfiber's core switch, A4 landscape, printed with the
-Field technician profile (`samples/0.5.0/field-technician-nordfiber-colo-tenant-a4-landscape.pdf`).*
+*Example: a colocation tenant's path from its switch to the carrier's core switch (demo data), A4 landscape,
+printed with the Field technician profile (`samples/0.5.0/field-technician-nordfiber-colo-tenant-a4-landscape.pdf`).*
 
 **Status: early development (0.7.0).** Start from a cable, interface, front port or circuit termination
 (and, with netbox-wdm / netbox-fms, a WDM circuit, fiber cable or fiber circuit), choose which facts to print
@@ -121,7 +121,7 @@ appears on rows with a cable and for users who may view cables.
 
 Under **Extend the trace** on the print page, *Show connections to add* lists the other cabled interfaces on
 the equipment at the start and at the end of the trace, grouped by where each one leads, for example
-`Ethernet49 → sto-sw-01 : Ethernet2 · 5 cables`. Click one and its path is added to the printout. The
+`Ethernet49 → agg-sw-01 : Ethernet2 · 5 cables`. Click one and its path is added to the printout. The
 equipment where two traces meet is drawn once, arriving on one port and leaving on another. You can keep
 adding at either end (server – switch – ... – circuit – ... – switch – server), remove the last addition
 again, and the whole chain is one printout with one title, summary, page numbering and set of chevron markers.
@@ -154,8 +154,8 @@ printed in the header. Blocks that are not equipment (circuits, sites, provider 
 field of the cable): a coloured line and a swatch by its name. **Colour or black and white is the paper
 choice**: *A4 (Color)* prints the cable colours, *A4 (B/W)* prints them as grey tones of the same lightness (still
 told apart by shade and by the cable's name), on any paper size. The *Colour* fact only decides whether the
-colour's name (*Colour: Green*) is printed. The sample dataset sets them by rule: grey copper, yellow fiber, black DAC cables, and green
-24-pair trunks inside a site and blue ones between sites. Colouring blocks by site, location or rack is a
+colour's name (*Colour: Green*) is printed. The colours are whatever the cables carry in NetBox; the examples in `samples/` use grey copper, yellow fiber,
+black DAC cables, and green 24-pair trunks inside a site and blue ones between sites. Colouring blocks by site, location or rack is a
 planned step (`docs/ROADMAP.md`).
 
 ## Known limits
@@ -173,10 +173,9 @@ planned step (`docs/ROADMAP.md`).
 python -m tests.demo_layout         # regenerate samples/<version>/ (run it in the container)
 ```
 
-The live tests (`tests/live_smoke.py`, `live_render.py`, `live_profiles.py`, `live_wdm.py`, `live_fms.py`,
-`live_scope.py`) run
-inside a NetBox container against the Nordfiber sample data. `docs/TESTING.md` explains the local setup and how
-to build that data; `docs/ARCHITECTURE.md` explains how the plugin is put together and how to add a fact, a
+The live test (`tests/live_smoke.py`) runs inside a NetBox container that has the plugin installed: it seeds a
+small network of its own, tests the pages against it and removes it again, so it needs no sample data and no other
+plugin. `docs/TESTING.md` explains the local setup; `docs/ARCHITECTURE.md` explains how the plugin is put together and how to add a fact, a
 starting point or support for another plugin. Releases are listed in `CHANGELOG.md`.
 
 ## Compatibility
@@ -202,8 +201,7 @@ through Claude Code): the code, the tests, the documentation and the sample prin
 in pair-programming sessions. Every commit made with Claude's help carries a `Co-Authored-By: Claude Sonnet 5.5`
 line, so the model behind any change can be read from the history and compared with later ones.
 
-The sample printouts come from the [netbox-sampledata](https://github.com/Uttiponken/netbox-sampledata)
-dataset: fictional companies on real hardware (see "Authors" in its README).
+The sample printouts come from demo data: fictional companies on real hardware.
 
 ## Upgrading from netbox-trace-print (0.6.2 and earlier)
 

@@ -5,8 +5,8 @@ from netbox_tracepath_plugin.model import Block, Cable, Field, Link, PortRow, Tr
 YELLOW, GRAY, BLACK = "ffeb3b", "9e9e9e", "111111"
 
 
-def _device(title, role, dtype, in_port="", out_port="", site="Nordfiber Stockholm DC", rack="STO-TR-01", u="U34",
-            loc="Telecom Room", tenant="Nordfiber AB", serial="ARI-STO-0002", asset="NF-STO-00005", port_fields=True):
+def _device(title, role, dtype, in_port="", out_port="", site="Fictional Northland DC", rack="DC1-TR-01", u="U34",
+            loc="Telecom Room", tenant="Fictional AB", serial="ARI-DC1-0002", asset="AT-DC1-00005", port_fields=True):
     pf = lambda t, lab="": [Field("Type", t)] + ([Field("Label", lab)] if lab else []) if port_fields else []
     return Block(
         title=title, subtitle=f"{role} · {dtype}", kind="device",
@@ -17,7 +17,7 @@ def _device(title, role, dtype, in_port="", out_port="", site="Nordfiber Stockho
         site=site, location=loc, rack=rack)
 
 
-def _cable(label, ctype="smf-os2", length="2 m", color=YELLOW, cname="Yellow", tenant="Nordfiber AB", status="Connected"):
+def _cable(label, ctype="smf-os2", length="2 m", color=YELLOW, cname="Yellow", tenant="Fictional AB", status="Connected"):
     return Cable(title=label, color_hex=color, color_name=cname,
                  fields=[Field("Type", ctype), Field("Length", length), Field("Status", status), Field("Tenant", tenant)])
 
@@ -25,30 +25,30 @@ def _cable(label, ctype="smf-os2", length="2 m", color=YELLOW, cname="Yellow", t
 def long_trace(blocks=11):
     """A chain like a colo tenant's path through two MeetMe panels and a patch panel, then onwards."""
     names = [
-        ("polaris-sto-sw-01", "Access Switch", "Arista DCS-7010T-48", "", "Ethernet49"),
-        ("polaris-sto-tor-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
-        ("sto-mmr-polaris-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
-        ("sto-mmr-nordfiber-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
-        ("sto-patch-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 4", "Port 4"),
-        ("sto-sw-01", "Aggregation Switch", "Arista DCS-7050SX3-48YC8-F", "Ethernet2", ""),
+        ("tenants-dc1-sw-01", "Access Switch", "Arista DCS-7010T-48", "", "Ethernet49"),
+        ("tenants-dc1-tor-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
+        ("dc1-mmr-tenants-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
+        ("dc1-mmr-operators-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
+        ("dc1-patch-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 4", "Port 4"),
+        ("dc1-sw-01", "Aggregation Switch", "Arista DCS-7050SX3-48YC8-F", "Ethernet2", ""),
     ]
-    extra = [("sto-rtr-01", "Core Router", "Juniper MX204", "xe-0/1/0", "xe-0/1/1"),
-             ("got-patch-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
-             ("got-wdm-01", "WDM Terminal", "Smartoptics DCP-M40-PAM4-ER", "Line", "922"),
-             ("got-wdm-02", "WDM Terminal", "Smartoptics DCP-M40-PAM4-ER", "922", "Line"),
-             ("mma-patch-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 2", "Port 2"),
-             ("mma-rtr-01", "Core Router", "Juniper MX204", "et-0/0/1", "")]
+    extra = [("dc1-rtr-01", "Core Router", "Juniper MX204", "xe-0/1/0", "xe-0/1/1"),
+             ("dc2-patch-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 1", "Port 1"),
+             ("dc2-wdm-01", "WDM Terminal", "Smartoptics DCP-M40-PAM4-ER", "Line", "922"),
+             ("dc2-wdm-02", "WDM Terminal", "Smartoptics DCP-M40-PAM4-ER", "922", "Line"),
+             ("dc3-patch-01", "Patch Panel", "Generic LC 24-port fiber patch panel", "Port 2", "Port 2"),
+             ("dc3-rtr-01", "Core Router", "Juniper MX204", "et-0/0/1", "")]
     allb = (names[:-1] + extra + [names[-1]])[:blocks]
     allb[-1] = allb[-1][:4] + ("",)
-    blocks_ = [_device(t, r, d, i, o, rack=f"STO-TR-{k % 3 + 1:02d}", u=f"U{42 - k}") for k, (t, r, d, i, o) in enumerate(allb)]
-    links = [Link([_cable(f"sto-cbl-{k + 1:05d}", length=("30 m" if k % 3 == 1 else "2 m"))]) for k in range(len(blocks_) - 1)]
+    blocks_ = [_device(t, r, d, i, o, rack=f"DC1-TR-{k % 3 + 1:02d}", u=f"U{42 - k}") for k, (t, r, d, i, o) in enumerate(allb)]
+    links = [Link([_cable(f"dc1-cbl-{k + 1:05d}", length=("30 m" if k % 3 == 1 else "2 m"))]) for k in range(len(blocks_) - 1)]
     return TraceDoc(
-        title=f"Cable trace: sto-cbl-00001 … sto-cbl-{len(links):05d}",
-        summary=["From polaris-sto-sw-01 : Ethernet49   to   mma-rtr-01 : et-0/0/1",
+        title=f"Cable trace: dc1-cbl-00001 … dc1-cbl-{len(links):05d}",
+        summary=["From tenants-dc1-sw-01 : Ethernet49   to   dc3-rtr-01 : et-0/0/1",
                  f"{len(links)} cables · total length 126 m+ · path complete"],
         blocks=blocks_, links=links,
         notes=["Path is incomplete beyond the last block: the far end is not connected."] if blocks == 7 else [],
-        footer="Generated 2026-10-02 by demo-loader · netbox-tracepath-plugin 0.1.0")
+        footer="Generated 2026-10-02 by test-loader · netbox-tracepath-plugin 0.1.0")
 
 
 def tiny_trace():
@@ -67,7 +67,7 @@ def hostile_trace():
         b.fields.append(Field("A very long label that needs wrapping too", "value"))
         b.fields.append(Field("Comments", "Line one\nLine two with åäö\n" + "word " * 40))
         blocks.append(b)
-    blocks.append(Block(title="Circuit NF-BRG-0001", subtitle="Nordfiber AB · Ethernet Private Line", kind="circuit"))
+    blocks.append(Block(title="Circuit EX-CIR-0001", subtitle="Fictional AB · Ethernet Private Line", kind="circuit"))
     links = [Link([_cable(f"cable-{long_id[:30]}-{k}", tenant="Ünïcode Tenant Ålesund " * 3)]) for k in range(len(blocks) - 1)]
     links[2] = Link([_cable("fan-a"), _cable("fan-b", color="", cname="")])      # a path that fans out
     return TraceDoc(title="Hostile trace " + long_id, summary=["x " * 80, "y"], blocks=blocks, links=links,

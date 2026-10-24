@@ -10,7 +10,10 @@
 2. **Colour by site / location / rack**, so connection points are easy to find, and still fully
    readable in black and white (tint + pattern + text tag, never colour alone).
 3. **Further improvements**, among them a page-break preference, bulk prints, cable end labels with QR codes,
-   rack elevations with the U highlighted, a work-order mode, saved presets.
+   rack elevations with the U highlighted, a work-order mode, saved presets, **dark-fiber circuits** (an FMS
+   fiber circuit whose two ends are bare patch-panel ports, such as a leased dark pair, has no NetBox cable path
+   and so nothing to print today: the page says so; the glass path could be drawn from the FMS strands instead)
+   and a **region scope** (all the sites of one metro area in one printout).
 
 ## Decisions so far
 
