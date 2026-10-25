@@ -10,7 +10,7 @@ continues E–F–G on the next.
 *Example: a colocation tenant's path from its switch to the carrier's core switch (demo data), A4 landscape,
 printed with the Field technician profile (`samples/0.5.0/field-technician-nordfiber-colo-tenant-a4-landscape.pdf`).*
 
-**Status: early development (0.7.0).** Start from a cable, interface, front port or circuit termination
+**Status: early development (0.8.0).** Start from a cable, interface, front port or circuit termination
 (and, with netbox-wdm / netbox-fms, a WDM circuit, fiber cable or fiber circuit), choose which facts to print
 (by recipient, using print profiles), extend the trace at either end, see it as a PDF in the page and download
 it, optionally limited to one site, location or rack. Colours by site/rack are next. See `docs/ROADMAP.md` and
@@ -180,7 +180,7 @@ starting point or support for another plugin. Releases are listed in `CHANGELOG.
 
 ## Compatibility
 
-NetBox 4.6.x.
+NetBox 4.6.x and 4.7.x (checked on 4.6.10 and 4.7.3). With netbox-fms, both the older releases (0.4, 0.5) and 0.6, which derives fiber paths by analysis, are supported.
 
 ## Install
 

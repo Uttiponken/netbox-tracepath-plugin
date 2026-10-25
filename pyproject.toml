@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netbox-tracepath-plugin"
-version = "0.7.0"
+version = "0.8.0"
 description = "Printable PDF cable traces for technicians and field engineers, for NetBox."
 readme = "README.md"
 license = "Apache-2.0"

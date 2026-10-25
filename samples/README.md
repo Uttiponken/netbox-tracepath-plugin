@@ -20,6 +20,7 @@ One directory per plugin release, so a layout can be discussed by name and versi
 | 0.6.1 | No new samples |
 | 0.6.2 | Block headers in the colour of the equipment's role (`*-colo-tenant-*`, `*-wdm-circuit-*`) |
 | 0.7.0 | No new samples (the footer of a printout now names netbox-tracepath-plugin) |
+| 0.8.0 | No new samples (the printouts are unchanged; netbox-fms 0.6 and NetBox 4.7 give the same pages) |
 
 Regenerate the synthetic ones with `python -m tests.demo_layout` (inside a NetBox container, see `run-tests.sh`).
 The real-trace ones were rendered from a demo data set that is not part of this repository, and are kept as they were.

@@ -2,8 +2,18 @@
 
 Releases are tagged `vX.Y.Z`; sample PDFs for each are in `samples/X.Y.Z/`.
 
-## Unreleased
+## 0.8.0
 
+- **NetBox 4.7.** The plugin now declares NetBox 4.6.0 to 4.7.99 (it was 4.6 only) and was checked on NetBox 4.7.3
+  with netbox-fms 0.6.0, netbox-wdm 0.2.2 and netbox-pathways 0.3.0: unit tests, the seeded smoke test and the
+  printouts of real traces. No other change was needed for 4.7 itself.
+- **netbox-fms 0.6.** That release no longer stores a traced path on each fiber circuit path: it derives fiber paths
+  by analysis and assigns one to a circuit. Without a change, every netbox-fms fact in a printout was lost (the
+  integration failed on the removed `FiberCircuitNode` and was skipped, as designed) and a fiber circuit could not
+  be printed. The integration now reads the ends of the assigned path (`end_a_port`, `end_b_port`) and the strands
+  landed on the link's ports to name the fiber circuit, and prints the same pages as before: the printouts of all
+  ten fiber circuits of the sample data are identical on netbox-fms 0.4.1 (NetBox 4.6) and 0.6.0 (NetBox 4.7).
+  netbox-fms 0.4 and 0.5 still work; the integration picks the model it finds.
 - **The repository no longer depends on any sample data.** `tests/live_smoke.py` now seeds a small network of its
   own, tests the pages against it and removes it again (also after a failure), so it runs on any NetBox that has
   the plugin installed and needs no other plugin; on a NetBox without other plugins it takes seconds. The tests that

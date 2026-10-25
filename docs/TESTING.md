@@ -11,7 +11,7 @@ They run in a throwaway NetBox container (default image `netbox:latest-plugins-p
 
 ## A local NetBox with the plugin
 
-Any NetBox 4.6 that has the plugin installed will do, with or without other plugins. A development setup:
+Any NetBox 4.6 or 4.7 that has the plugin installed will do, with or without other plugins. A development setup:
 
 - Install the plugin from this checkout (`pip install -e .`), or only put the folder on `PYTHONPATH`: the plugin
   has no dependencies. List `netbox_tracepath_plugin` in `PLUGINS`.

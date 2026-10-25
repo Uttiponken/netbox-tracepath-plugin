@@ -99,12 +99,33 @@ def _strand_fact(fc, port_ids):
     return _f("Strands", strand_text(strands), "fms.strands")
 
 
-def _circuit_fact(cable, port_ids):
-    from netbox_fms.models import FiberCircuit, FiberCircuitNode
+def derives_paths():
+    """True from netbox-fms 0.6, where a circuit is assigned analysed FiberStrandPaths (end_a_port, end_b_port and
+    the hops between them); before that each FiberCircuitPath stored its own origin, destination and nodes."""
+    from netbox_fms.models import FiberCircuitPath
 
-    through = FiberCircuitNode.objects.filter(front_port_id__in=port_ids).values("path_id")
-    circuits = (FiberCircuit.objects.filter(paths__id__in=through).filter(paths__nodes__cable_id=cable.pk)
-                .select_related("tenant").distinct().order_by("cid", "name"))
+    return any(f.name == "strand_path" for f in FiberCircuitPath._meta.get_fields())
+
+
+def _circuit_fact(cable, port_ids):
+    from django.db.models import Q
+    from netbox_fms.models import FiberCircuit
+
+    if derives_paths():
+        from netbox_fms.models import FiberStrand
+
+        # A circuit touches this link when one of its ends is a port of the link or one of the strands it runs
+        # on is landed on such a port (the ports are on either side of the cable in the trace).
+        landed = FiberStrand.objects.all().landed_on(port_ids)
+        found = FiberCircuit.objects.filter(
+            Q(paths__strand_path__end_a_port_id__in=port_ids) | Q(paths__strand_path__end_b_port_id__in=port_ids)
+            | Q(paths__strand_path__hops__strand__in=landed))
+    else:
+        from netbox_fms.models import FiberCircuitNode
+
+        through = FiberCircuitNode.objects.filter(front_port_id__in=port_ids).values("path_id")
+        found = FiberCircuit.objects.filter(paths__id__in=through).filter(paths__nodes__cable_id=cable.pk)
+    circuits = found.select_related("tenant").distinct().order_by("cid", "name")
     return _f("Fiber circuit", "; ".join(f"{c.cid} · {c.name}" if c.cid else c.name for c in circuits), "fms.circuit")
 
 
@@ -121,19 +142,32 @@ def _port_label(port):
     return f"{port.device.name} : {port.name}"
 
 
+def _circuit_ends(circuit):
+    """(front port, front port) per path of the circuit, in path order; an end is None where the path is unfinished."""
+    if derives_paths():
+        for p in circuit.paths.select_related("strand_path__end_a_port__device",
+                                              "strand_path__end_b_port__device").order_by("position"):
+            if p.strand_path is not None:
+                yield p.strand_path.end_a_port, p.strand_path.end_b_port
+    else:
+        for p in circuit.paths.select_related("origin__device", "destination__device").order_by("position"):
+            yield p.origin, p.destination
+
+
 def circuit_paths(circuit):
     """The physical paths a fiber circuit runs on, as dicts with a label and the equipment at either end.
 
-    FMS follows the glass from an origin front port to a destination front port; the cables and equipment on the
+    FMS follows the glass from one front port to another (netbox-fms 0.6: the ends of the strand path assigned to
+    the circuit; before that the origin and destination of the circuit path); the cables and equipment on the
     way are NetBox's own cable paths, found as the paths that pass through both ports (one per direction)."""
     from dcim.models import CablePath
 
     ends, seen = [], set()
-    for p in circuit.paths.select_related("origin__device", "destination__device").order_by("position"):
-        if p.destination_id is None or (p.origin_id, p.destination_id) in seen:
+    for first, last in _circuit_ends(circuit):
+        if first is None or last is None or (first.pk, last.pk) in seen:
             continue
-        seen.add((p.origin_id, p.destination_id))
-        ends.append((p.origin, p.destination))
+        seen.add((first.pk, last.pk))
+        ends.append((first, last))
     out, used = [], set()
     for origin, destination in ends:
         for path in CablePath.objects.filter(_nodes__contains=origin).filter(_nodes__contains=destination):

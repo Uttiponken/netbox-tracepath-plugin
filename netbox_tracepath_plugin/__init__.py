@@ -1,6 +1,6 @@
 from netbox.plugins import PluginConfig
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 
 class TracepathConfig(PluginConfig):
@@ -11,7 +11,7 @@ class TracepathConfig(PluginConfig):
     version = __version__
     base_url = "tracepath"
     min_version = "4.6.0"
-    max_version = "4.6.99"
+    max_version = "4.7.99"
     # No settings yet. Every option (paper, orientation, fields) is chosen when printing.
     default_settings = {}
 
