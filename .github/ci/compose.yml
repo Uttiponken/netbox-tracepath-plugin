@@ -1,0 +1,58 @@
+# A throwaway NetBox with only this plugin, for the live smoke test in CI (.github/workflows/tests.yml).
+# NETBOX_IMAGE picks the NetBox version. The passwords and keys are placeholders for containers that live for one
+# CI job and are never reachable from outside; nothing here is a real secret.
+#
+#   NETBOX_IMAGE=docker.io/netboxcommunity/netbox:v4.7-5.1.1 docker compose -f .github/ci/compose.yml up -d --wait
+services:
+  netbox:
+    image: ${NETBOX_IMAGE:-docker.io/netboxcommunity/netbox:v4.7-5.1.1}
+    user: "netbox:root"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      redis-cache:
+        condition: service_started
+    environment:
+      DB_HOST: postgres
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: ci-placeholder
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ci-placeholder
+      REDIS_DATABASE: "0"
+      REDIS_CACHE_HOST: redis-cache
+      REDIS_CACHE_PASSWORD: ci-placeholder
+      REDIS_CACHE_DATABASE: "1"
+      SECRET_KEY: ci-placeholder-ci-placeholder-ci-placeholder-ci-placeholder
+      API_TOKEN_PEPPER_1: ci-placeholder-ci-placeholder-ci-placeholder-ci-placeholder
+      SKIP_SUPERUSER: "true"
+      # The plugin has no dependencies, so the checkout on PYTHONPATH is enough; no pip install.
+      PYTHONPATH: /opt/netbox/custom-plugins/netbox-tracepath-plugin
+    volumes:
+      - ../..:/opt/netbox/custom-plugins/netbox-tracepath-plugin:ro
+      - ./plugins.py:/etc/netbox/config/plugins.py:ro
+    healthcheck:
+      test: curl -f http://localhost:8080/login/ || exit 1
+      start_period: 600s
+      start_interval: 5s
+      interval: 15s
+      timeout: 5s
+  postgres:
+    image: docker.io/postgres:18-alpine
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ci-placeholder
+    healthcheck:
+      test: pg_isready -q -t 2 -d netbox -U netbox
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    image: docker.io/valkey/valkey:9.1-alpine
+    command: [valkey-server, --requirepass, ci-placeholder]
+  redis-cache:
+    image: docker.io/valkey/valkey:9.1-alpine
+    command: [valkey-server, --requirepass, ci-placeholder]

@@ -38,6 +38,22 @@ netbox-wdm installed it takes minutes, because that plugin re-traces its wavelen
 Facts from netbox-fms and netbox-wdm are covered by the unit tests and by whoever runs the plugin on data that has
 them; the smoke test only checks that the plugin works with those integrations switched off.
 
+## Continuous integration
+
+`.github/workflows/tests.yml` runs on every push to `main`, on pull requests and by hand. For each NetBox minor
+version the plugin declares (4.6 and 4.7, each at its newest patch through the moving netbox-docker tags
+`v4.6-5.0.2` and `v4.7-5.1.1`), it runs the unit tests, starts a throwaway NetBox with only this plugin
+(`.github/ci/compose.yml`, `.github/ci/plugins.py`) and pipes the live smoke test into it; the job fails unless
+the test ends with `ALL OK`. The same setup runs locally:
+
+```bash
+NETBOX_IMAGE=docker.io/netboxcommunity/netbox:v4.7-5.1.1 COMPOSE_FILE=.github/ci/compose.yml docker compose up -d --wait
+COMPOSE_FILE=.github/ci/compose.yml docker compose exec -T netbox sh -c "cd /opt/netbox/netbox && python manage.py shell" < tests/live_smoke.py
+COMPOSE_FILE=.github/ci/compose.yml docker compose down -v
+```
+
+When the plugin's `max_version` moves to a new NetBox minor version, add that version to the matrix.
+
 ## More realistic data
 
 Anything with cabled equipment works. To look at the output on a larger network, load any data set you like and

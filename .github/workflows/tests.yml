@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: NetBox ${{ matrix.netbox }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The NetBox versions the plugin declares (min_version 4.6.0, max_version 4.7.99), each at its newest patch:
+        # the netbox-docker minor tags move with every NetBox patch release.
+        include:
+          - netbox: "4.6"
+            image: docker.io/netboxcommunity/netbox:v4.6-5.0.2
+          - netbox: "4.7"
+            image: docker.io/netboxcommunity/netbox:v4.7-5.1.1
+    env:
+      NETBOX_IMAGE: ${{ matrix.image }}
+      COMPOSE_FILE: .github/ci/compose.yml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Unit tests
+        run: ./run-tests.sh
+      - name: Start a NetBox with only this plugin
+        run: docker compose up -d --wait --wait-timeout 900
+      - name: NetBox version
+        run: docker compose exec -T netbox sh -c 'grep -m1 "^version" /opt/netbox/netbox/release.yaml'
+      - name: Live smoke test
+        run: |
+          docker compose exec -T netbox sh -c "cd /opt/netbox/netbox && /opt/netbox/venv/bin/python manage.py shell" \
+            < tests/live_smoke.py | tee smoke.log
+          grep -q "ALL OK" smoke.log
+      - name: NetBox log on failure
+        if: failure()
+        run: docker compose logs --no-color netbox | tail -200
